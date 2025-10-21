@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Foundry VTT Journal Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'foundry-dark': '#1a1a1a',
+              'foundry-mid': '#2a2a2a',
+              'foundry-light': '#3c3c3c',
+              'foundry-accent': '#ff6400',
+              'foundry-text': '#f0f0f0',
+              'foundry-text-muted': '#a0a0a0',
+            },
+          },
+        },
+      }
+    </script>
+    <style>
+      /* Unified Journal Styles */
+
+      /* Base Layout */
+      .journal-sheet {
+        background-color: #2a2a2a; /* foundry-mid */
+        color: #f0f0f0; /* foundry-text */
+        border: 1px solid #3c3c3c; /* foundry-light */
+        border-radius: 0.5rem;
+      }
+      .journal-header {
+        background-color: #1a1a1a; /* foundry-dark */
+        border-bottom: 1px solid #3c3c3c; /* foundry-light */
+      }
+      .journal-header h2 {
+          color: #ff6400; /* foundry-accent */
+      }
+
+      /* Sidebar */
+      .journal-sidebar {
+        background-color: #1a1a1a; /* foundry-dark */
+        border-right: 1px solid #3c3c3c; /* foundry-light */
+      }
+      .journal-page-link {
+        color: #a0a0a0; /* foundry-text-muted */
+        transition: background-color 0.2s, color 0.2s;
+      }
+      .journal-page-link:hover {
+        background-color: #3c3c3c; /* foundry-light */
+        color: #f0f0f0; /* foundry-text */
+      }
+      .journal-page-link.active {
+        background-color: #ff6400; /* foundry-accent */
+        color: #1a1a1a; /* foundry-dark */
+        font-weight: bold;
+      }
+
+      /* Main Content Area */
+      .journal-entry-page {
+        background-color: #242424;
+        color: #f0f0f0; /* foundry-text */
+      }
+      
+      /* Hide all images inside journal content */
+      .journal-page-content img {
+        display: none !important;
+      }
+
+      /* Headings */
+      .journal-page-content h1,
+      .journal-page-content h2,
+      .journal-page-content h3,
+      .journal-page-content h4,
+      .journal-page-content h5 {
+        color: #ff6400; /* foundry-accent */
+        border-bottom: 1px solid #3c3c3c; /* foundry-light */
+        padding-bottom: 0.5rem;
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+      }
+      .journal-page-content h1 { font-size: 1.875rem; }
+      .journal-page-content h2 { font-size: 1.5rem; }
+      .journal-page-content h3 { font-size: 1.25rem; }
+
+      /* Paragraphs */
+      .journal-page-content p {
+        text-align: justify;
+        text-align-last: left; /* Keep last line left-aligned */
+        text-indent: 1.5em; /* Indent first line */
+        margin-bottom: 0.84em; /* Reduced space between paragraphs to 1.2x inter-line spacing */
+        line-height: 1.7; /* Space between lines within a paragraph */
+      }
+      .journal-page-content p:first-of-type {
+        text-indent: 0; /* No indent for the very first paragraph */
+      }
+      .journal-page-content h1 + p,
+      .journal-page-content h2 + p,
+      .journal-page-content h3 + p,
+      .journal-page-content h4 + p,
+      .journal-page-content h5 + p {
+          text-indent: 0; /* No indent for paragraphs immediately after a heading */
+      }
+
+
+      /* БлокСтат */
+      .journal-page-content .БлокСтат {
+        background-color: #1a1a1a; /* foundry-dark */
+        border: 2px solid #3c3c3c; /* foundry-light */
+        border-radius: 0.5rem; /* rounded corners */
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+
+      /* blockquote */
+      .journal-page-content blockquote {
+        background-color: #1a1a1a; /* foundry-dark */
+        padding: 1.5rem 1rem;
+        margin: 1rem 0;
+        position: relative;
+        border: none;
+        text-align: justify;
+      }
+
+      .journal-page-content blockquote::before,
+      .journal-page-content blockquote::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: #ff6400; /* foundry-accent */
+      }
+      .journal-page-content blockquote::before {
+        top: 0;
+      }
+      .journal-page-content blockquote::after {
+        bottom: 0;
+      }
+
+      /* section.insite */
+      .journal-page-content section.insite {
+        background-color: #3c3c3c; /* foundry-light */
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 0.25rem;
+      }
+
+      /* Tables */
+      .journal-page-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        border: 1px solid #3c3c3c; /* foundry-light */
+      }
+      .journal-page-content th,
+      .journal-page-content td {
+        border: 1px solid #3c3c3c; /* foundry-light */
+        padding: 0.75rem;
+        text-align: left;
+      }
+      .journal-page-content th {
+        background-color: #1a1a1a; /* foundry-dark */
+        color: #ff6400; /* foundry-accent */
+        font-weight: bold;
+      }
+      .journal-page-content tr:nth-child(even) {
+        background-color: #242424; /* A slightly different shade for alternating rows */
+      }
+
+      /* Internal Journal Links */
+      .journal-page-content a.internal-journal-link {
+          color: #ff6400; /* foundry-accent */
+          text-decoration: underline;
+          text-decoration-style: double;
+          cursor: pointer;
+      }
+      .journal-page-content a.internal-journal-link:hover {
+          text-decoration-style: solid;
+          filter: brightness(1.2);
+      }
+
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-markdown@9": "https://esm.sh/react-markdown@9",
+    "remark-gfm@4": "https://esm.sh/remark-gfm@4"
+  }
+}
+</script>
+</head>
+  <body class="bg-foundry-dark text-foundry-text">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

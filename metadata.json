@@ -1,0 +1,5 @@
+{
+  "name": "Foundry VTT Journal Analyzer",
+  "description": "An application to upload, view, and ask an AI questions about a Foundry VTT JSON journal file. The AI provides insights based on the journal's content.",
+  "requestFramePermissions": []
+}
