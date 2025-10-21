@@ -20,15 +20,14 @@ export interface Item {
 }
 
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
-
 export async function analyzeWorld(journals: Journal[], actors: Actor[], items: Item[], question: string): Promise<string> {
+  const API_KEY = process.env.API_KEY;
+
+  if (!API_KEY) {
+    throw new Error("AI features are disabled. A Google AI API key is required to use the chat.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: API_KEY });
   const model = 'gemini-2.5-flash';
   
   const journalCollection = journals.map(j => ({

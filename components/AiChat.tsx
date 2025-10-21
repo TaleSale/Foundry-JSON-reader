@@ -15,6 +15,7 @@ interface AiChatProps {
   chatHistory: ChatMessage[];
   isLoading: boolean;
   isReady: boolean;
+  isAiConfigured: boolean;
 }
 
 const LoadingSpinner: React.FC = () => (
@@ -26,7 +27,7 @@ const LoadingSpinner: React.FC = () => (
     </div>
 );
 
-const AiChat: React.FC<AiChatProps> = ({ prompt, setPrompt, onSubmit, chatHistory, isLoading, isReady }) => {
+const AiChat: React.FC<AiChatProps> = ({ prompt, setPrompt, onSubmit, chatHistory, isLoading, isReady, isAiConfigured }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit();
@@ -44,7 +45,7 @@ const AiChat: React.FC<AiChatProps> = ({ prompt, setPrompt, onSubmit, chatHistor
       <div className="flex-grow p-4 overflow-y-auto">
         {chatHistory.length === 0 && !isLoading && (
              <div className="h-full flex items-center justify-center text-foundry-text-muted text-center p-4">
-                <p>{isReady ? "Ask a question about the loaded files." : "Add a journal, actor, or item to begin."}</p>
+                <p>{!isAiConfigured ? "AI features are disabled. A Google AI API key is required to use the chat." : isReady ? "Ask a question about the loaded files." : "Add a journal, actor, or item to begin."}</p>
             </div>
         )}
 
@@ -82,10 +83,10 @@ const AiChat: React.FC<AiChatProps> = ({ prompt, setPrompt, onSubmit, chatHistor
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder={isReady ? "Ask about the loaded files..." : "Please add a journal, actor, or item first..."}
+            placeholder={!isAiConfigured ? "API key not configured. Chat is disabled." : isReady ? "Ask about the loaded files..." : "Please add a journal, actor, or item first..."}
             className="flex-grow bg-foundry-dark border border-foundry-light rounded-md p-2 focus:ring-2 focus:ring-foundry-accent focus:outline-none resize-none transition-shadow"
             rows={2}
-            disabled={!isReady || isLoading}
+            disabled={!isReady || isLoading || !isAiConfigured}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -95,7 +96,7 @@ const AiChat: React.FC<AiChatProps> = ({ prompt, setPrompt, onSubmit, chatHistor
           />
           <button
             type="submit"
-            disabled={!isReady || isLoading || !prompt.trim()}
+            disabled={!isReady || isLoading || !prompt.trim() || !isAiConfigured}
             className="px-4 py-2 bg-foundry-accent text-white font-semibold rounded-md hover:bg-orange-500 transition-colors disabled:bg-foundry-light disabled:cursor-not-allowed"
           >
             {isLoading ? (

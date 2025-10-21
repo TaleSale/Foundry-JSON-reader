@@ -52,6 +52,8 @@ const App: React.FC = () => {
     const [currentPrompt, setCurrentPrompt] = useState<string>('');
     const [error, setError] = useState<string>('');
     
+    const isAiConfigured = useMemo(() => !!process.env.API_KEY, []);
+
     // State for Journals
     const [isCreatingJournalFolder, setIsCreatingJournalFolder] = useState<boolean>(false);
     const [newJournalFolderName, setNewJournalFolderName] = useState<string>('');
@@ -329,7 +331,8 @@ const App: React.FC = () => {
             const aiMessage: ChatMessage = { role: 'model', content: response };
             setTopics(prevTopics => prevTopics.map(t => t.id === targetTopicId ? { ...t, messages: [...t.messages, aiMessage] } : t));
         } catch (err) {
-            const errorMessage: ChatMessage = { role: 'error', content: 'An error occurred while communicating with the AI. Please try again.' };
+            const content = err instanceof Error ? err.message : 'An error occurred while communicating with the AI. Please try again.';
+            const errorMessage: ChatMessage = { role: 'error', content };
             setTopics(prevTopics => prevTopics.map(t => t.id === targetTopicId ? { ...t, messages: [...t.messages, errorMessage] } : t));
         } finally {
             setIsLoading(false);
@@ -519,7 +522,7 @@ const App: React.FC = () => {
                                 <div className="flex-shrink-0 p-3 border-b border-foundry-light">
                                     <div className="flex justify-between items-center mb-2">
                                         <h3 className="font-semibold text-foundry-text text-sm">Темы</h3>
-                                        <button onClick={() => setActiveTopicId(null)} className="px-2 py-1 bg-foundry-light text-foundry-text-muted rounded text-xs hover:bg-foundry-accent hover:text-white transition-colors">
+                                        <button onClick={() => setActiveTopicId(null)} className="px-2 py-1 bg-foundry-light text-foundry-text-muted rounded text-xs hover:bg-foundry-accent hover:text-white transition-colors" disabled={!isAiConfigured}>
                                             + Новая тема
                                         </button>
                                     </div>
@@ -537,7 +540,7 @@ const App: React.FC = () => {
                                     </div>
                                 </div>
                                 <div className="flex-grow overflow-hidden">
-                                     <AiChat prompt={currentPrompt} setPrompt={setCurrentPrompt} onSubmit={handleSubmitQuery} chatHistory={activeTopic?.messages || []} isLoading={isLoading} isReady={journals.length > 0 || actors.length > 0 || items.length > 0}/>
+                                     <AiChat prompt={currentPrompt} setPrompt={setCurrentPrompt} onSubmit={handleSubmitQuery} chatHistory={activeTopic?.messages || []} isLoading={isLoading} isReady={journals.length > 0 || actors.length > 0 || items.length > 0} isAiConfigured={isAiConfigured} />
                                 </div>
                             </div>
                         )}
