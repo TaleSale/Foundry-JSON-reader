@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown@9';
-import remarkGfm from 'remark-gfm@4';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export interface ChatMessage {
   role: 'user' | 'model' | 'error';

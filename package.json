@@ -1,5 +1,5 @@
 {
-  "name": "foundry-vtt-journal-analyzer",
+  "name": "foundry-json-reader",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,8 +12,8 @@
     "react-dom": "^19.2.0",
     "@google/genai": "^1.25.0",
     "react": "^19.2.0",
-    "react-markdown@9": "latest",
-    "remark-gfm@4": "latest"
+    "react-markdown": "9",
+    "remark-gfm": "4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
