@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { processFoundryTags } from '../utils/foundryParser';
+import { processFoundryTags, localize, formatPrice, formatBulk, slugToPascalCase } from '../utils/foundryParser';
 
 interface FoundryItemViewerProps {
   data: any;
@@ -9,9 +8,12 @@ interface FoundryItemViewerProps {
   localizationData: Record<string, any> | null;
 }
 
-const TraitPill: React.FC<{ trait: string }> = ({ trait }) => (
-    <span className="bg-foundry-light text-xs uppercase px-2 py-1 rounded">{trait}</span>
-);
+const TraitPill: React.FC<{ trait: string, localizationData: Record<string, any> | null }> = ({ trait, localizationData }) => {
+    const pascalSlug = slugToPascalCase(trait);
+    const labelKey = `PF2E.Trait${pascalSlug}`;
+    const label = localize(localizationData, labelKey, {}) || pascalSlug;
+    return <span className="bg-foundry-light text-xs uppercase px-2 py-1 rounded">{label}</span>
+};
 
 const DetailRow: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
     <div className="border-b border-foundry-light py-2">
@@ -27,62 +29,64 @@ const renderDescription = (desc: string, localizationData: Record<string, any> |
 };
 
 // --- Rune Name Helpers ---
-const getStrikingRuneName = (level: number) => {
-    if (level >= 3) return 'Major Striking';
-    if (level === 2) return 'Greater Striking';
-    if (level === 1) return 'Striking';
+const getStrikingRuneName = (level: number, locData: any) => {
+    if (level >= 3) return localize(locData, 'PF2E.Item.Weapon.Rune.Striking.Major', {});
+    if (level === 2) return localize(locData, 'PF2E.Item.Weapon.Rune.Striking.Greater', {});
+    if (level === 1) return localize(locData, 'PF2E.Item.Weapon.Rune.Striking.Striking', {});
     return '';
 };
 
-const getResilientRuneName = (level: number) => {
-    if (level >= 3) return 'Major Resilient';
-    if (level === 2) return 'Greater Resilient';
-    if (level === 1) return 'Resilient';
+const getResilientRuneName = (level: number, locData: any) => {
+    if (level >= 3) return localize(locData, 'PF2E.ArmorMajorResilientRune', {});
+    if (level === 2) return localize(locData, 'PF2E.ArmorGreaterResilientRune', {});
+    if (level === 1) return localize(locData, 'PF2E.ArmorResilientRune', {});
     return '';
 };
 
 
-const WeaponDetails: React.FC<{ system: any }> = ({ system }) => {
+const WeaponDetails: React.FC<{ system: any, localizationData: Record<string, any> | null }> = ({ system, localizationData }) => {
     const runes = system.runes || {};
     const potencyBonus = runes.potency || 0;
     const strikingBonus = runes.striking || 0;
     
     const attackBonus = (system.bonus?.value || 0) + potencyBonus;
     const damageDice = (system.damage.dice || 1) + strikingBonus;
+    const localizedGroup = localize(localizationData, `PF2E.WeaponGroup${slugToPascalCase(system.group)}`) || system.group;
 
     return (
         <>
-            <h4 className="text-md font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2 mt-4">Weapon Stats</h4>
+            <h4 className="text-md font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2 mt-4">Характеристики оружия</h4>
             <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><strong>Attack Bonus:</strong> {attackBonus > 0 ? `+${attackBonus}` : attackBonus}</div>
-                <div><strong>Damage:</strong> {damageDice}d{system.damage.die} {system.damage.damageType}</div>
-                <div><strong>Group:</strong> {system.group}</div>
-                {system.range && <div><strong>Range:</strong> {system.range}</div>}
-                <div><strong>Category:</strong> {system.category}</div>
+                <div><strong>{localize(localizationData, 'PF2E.AttackLabel', {})}:</strong> {attackBonus > 0 ? `+${attackBonus}` : attackBonus}</div>
+                <div><strong>{localize(localizationData, 'PF2E.DamageLabel', {})}:</strong> {damageDice}d{system.damage.die} {system.damage.damageType}</div>
+                <div><strong>{localize(localizationData, 'PF2E.Item.Weapon.GroupLabel', {})}:</strong> {localizedGroup}</div>
+                {system.range && <div><strong>{localize(localizationData, 'PF2E.Actor.Creature.Sense.RangeLabel', {})}:</strong> {system.range}</div>}
+                <div><strong>{localize(localizationData, 'PF2E.Item.FIELDS.category.label', {})}:</strong> {system.category}</div>
             </div>
         </>
     );
 };
 
-const ArmorDetails: React.FC<{ system: any }> = ({ system }) => {
+const ArmorDetails: React.FC<{ system: any, localizationData: Record<string, any> | null }> = ({ system, localizationData }) => {
     const runes = system.runes || {};
     const potencyBonus = runes.potency || 0;
     const resilientBonus = runes.resilient || 0;
     
     const totalAcBonus = (system.acBonus || 0) + potencyBonus;
+    const localizedGroup = localize(localizationData, `PF2E.ArmorGroup${slugToPascalCase(system.group)}`) || system.group;
 
     return (
      <>
-        <h4 className="text-md font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2 mt-4">Armor Stats</h4>
+        <h4 className="text-md font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2 mt-4">Характеристики брони</h4>
         <div className="grid grid-cols-2 gap-4 text-sm">
-            <div><strong>AC Bonus:</strong> {totalAcBonus}</div>
-            {resilientBonus > 0 && <div><strong>Saving Throw Bonus:</strong> +{resilientBonus}</div>}
-            <div><strong>Dex Cap:</strong> {system.dexCap}</div>
-            <div><strong>Check Penalty:</strong> {system.checkPenalty}</div>
-            <div><strong>Speed Penalty:</strong> {system.speedPenalty}ft</div>
-            <div><strong>Strength:</strong> {system.strength}</div>
-            <div><strong>Group:</strong> {system.group}</div>
-            <div><strong>Category:</strong> {system.category}</div>
+            <div><strong>{localize(localizationData, 'PF2E.ArmorArmorLabel', {})}:</strong> {totalAcBonus}</div>
+            {resilientBonus > 0 && <div><strong>Бонус спасбросков:</strong> +{resilientBonus}</div>}
+            <div><strong>{localize(localizationData, 'PF2E.ArmorDexLabel', {})}:</strong> {system.dexCap}</div>
+            <div><strong>{localize(localizationData, 'PF2E.ArmorCheckLabel', {})}:</strong> {system.checkPenalty}</div>
+            <div><strong>{localize(localizationData, 'PF2E.ArmorSpeedLabel', {})}:</strong> {system.speedPenalty}ft</div>
+            <div><strong>{localize(localizationData, 'PF2E.ArmorStrengthLabel', {})}:</strong> {system.strength}</div>
+            <div><strong>{localize(localizationData, 'PF2E.Item.Armor.GroupLabel', {})}:</strong> {localizedGroup}</div>
+            <div><strong>{localize(localizationData, 'PF2E.Item.FIELDS.category.label', {})}:</strong> {system.category}</div>
         </div>
     </>
     );
@@ -90,27 +94,27 @@ const ArmorDetails: React.FC<{ system: any }> = ({ system }) => {
 
 const ConsumableDetails: React.FC<{ system: any, localizationData: Record<string, any> | null }> = ({ system, localizationData }) => (
     <>
-        <h4 className="text-md font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2 mt-4">Consumable Details</h4>
+        <h4 className="text-md font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2 mt-4">Детали расходуемого</h4>
         <div className="text-sm">
-            <div><strong>Uses:</strong> {system.uses.value} of {system.uses.max} (auto-destroy: {system.uses.autoDestroy ? 'Yes' : 'No'})</div>
+            <div><strong>{localize(localizationData, 'PF2E.Item.Consumable.Uses.Label', {})}:</strong> {system.uses.value} of {system.uses.max} (auto-destroy: {system.uses.autoDestroy ? 'Yes' : 'No'})</div>
         </div>
         {system.spell && (
             <div className="mt-4 p-3 bg-foundry-dark rounded-md">
-                <h5 className="font-bold">Embedded Spell: {system.spell.name}</h5>
+                <h5 className="font-bold">{localize(localizationData, 'PF2E.Item.Consumable.Spell.Label', {})}: {system.spell.name}</h5>
                 {renderDescription(system.spell.system.description.value, localizationData)}
             </div>
         )}
     </>
 );
 
-const EffectDetails: React.FC<{ system: any }> = ({ system }) => (
+const EffectDetails: React.FC<{ system: any, localizationData: Record<string, any> | null }> = ({ system, localizationData }) => (
     <>
-        <h4 className="text-md font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2 mt-4">Effect Details</h4>
+        <h4 className="text-md font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2 mt-4">Детали эффекта</h4>
         <div className="text-sm">
-            <p><strong>Duration:</strong> {system.duration.value === -1 ? system.duration.unit : `${system.duration.value} ${system.duration.unit}`}</p>
+            <p><strong>{localize(localizationData, 'PF2E.Time.Duration', {})}:</strong> {system.duration.value === -1 ? system.duration.unit : `${system.duration.value} ${system.duration.unit}`}</p>
             {system.rules?.length > 0 && (
                 <div className="mt-2">
-                    <strong>Rules:</strong>
+                    <strong>{localize(localizationData, 'PF2E.Item.Rules.Tab', {})}:</strong>
                     <ul className="list-disc pl-5 mt-1">
                         {system.rules.map((rule: any, index: number) => (
                             <li key={index} className="font-mono text-xs bg-foundry-dark p-2 rounded my-1">
@@ -126,7 +130,6 @@ const EffectDetails: React.FC<{ system: any }> = ({ system }) => (
 
 
 const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, localizationData }) => {
-    const [imgError, setImgError] = useState(false);
     const { system, type, name } = data;
     const itemViewerRef = useRef<HTMLDivElement>(null);
 
@@ -169,20 +172,20 @@ const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActor
             prefix += `+${potencyBonus} `;
         }
         if (type === 'weapon' && runes.striking > 0) {
-            prefix += `${getStrikingRuneName(runes.striking)} `;
+            prefix += `${getStrikingRuneName(runes.striking, localizationData)} `;
         }
         if (type === 'armor' && runes.resilient > 0) {
-            prefix += `${getResilientRuneName(runes.resilient)} `;
+            prefix += `${getResilientRuneName(runes.resilient, localizationData)} `;
         }
         return `${prefix}${name}`.trim();
-    }, [name, type, system.runes]);
+    }, [name, type, system.runes, localizationData]);
 
     const renderItemDetails = () => {
         switch (data.type) {
-            case 'weapon': return <WeaponDetails system={system} />;
-            case 'armor': return <ArmorDetails system={system} />;
+            case 'weapon': return <WeaponDetails system={system} localizationData={localizationData} />;
+            case 'armor': return <ArmorDetails system={system} localizationData={localizationData} />;
             case 'consumable': return <ConsumableDetails system={system} localizationData={localizationData} />;
-            case 'effect': return <EffectDetails system={system} />;
+            case 'effect': return <EffectDetails system={system} localizationData={localizationData} />;
             case 'equipment': // Catches runes and other gear
                  return null;
             default:
@@ -199,65 +202,45 @@ const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActor
     const strikingBonus = type === 'weapon' ? (runes.striking || 0) : 0;
     const resilientBonus = type === 'armor' ? (runes.resilient || 0) : 0;
 
-    const price = system.price?.value;
-    let priceString = 'N/A';
-    if (price) {
-        priceString = Object.entries(price).map(([currency, amount]) => `${amount} ${currency}`).join(', ');
-    }
+    const priceString = formatPrice(system.price, localizationData);
     
     return (
         <div ref={itemViewerRef} className="bg-foundry-mid text-foundry-text h-full flex flex-col font-sans overflow-y-auto">
              <header className="bg-foundry-dark p-3 border-b border-foundry-light flex justify-between items-start sticky top-0 z-10">
                 <h2 className="text-2xl font-bold text-foundry-accent">{modifiedName}</h2>
                 <div className="text-right">
-                    <span className="text-lg font-bold">ITEM {system.level.value}</span>
+                    <span className="text-lg font-bold">{localize(localizationData, 'PF2E.ItemLevel', { type: localize(localizationData, 'PF2E.ItemTitle', {}), level: system.level.value })}</span>
                 </div>
             </header>
             
-            <main className="flex-grow p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Left Column */}
-                <aside className="md:col-span-1 space-y-4">
-                    {!imgError && data.img && (
-                        <div className="bg-foundry-dark p-2 rounded-md border border-foundry-light flex justify-center items-center">
-                            <img 
-                                src={data.img} 
-                                alt={data.name} 
-                                className="max-h-48 object-contain"
-                                onError={() => setImgError(true)}
-                            />
-                        </div>
-                    )}
-                    
-                    <div className="bg-foundry-dark p-3 rounded-md border border-foundry-light space-y-2">
-                        <DetailRow label="Price">{priceString}</DetailRow>
-                        <DetailRow label="Bulk">{system.bulk?.value ?? 'N/A'}</DetailRow>
-                        <DetailRow label="Traits">
-                            <div className="flex flex-wrap gap-1 mt-1">
-                                {(system.traits.value || []).map((trait: string) => (
-                                    <TraitPill key={trait} trait={trait} />
-                                ))}
-                            </div>
-                        </DetailRow>
+            <main className="flex-grow p-4">
+                <article className="bg-foundry-dark p-4 rounded-md border border-foundry-light">
+                    <div className="flex flex-wrap gap-1 mb-4">
+                        {(system.traits.value || []).map((trait: string) => (
+                            <TraitPill key={trait} trait={trait} localizationData={localizationData} />
+                        ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mb-4">
+                        <DetailRow label={localize(localizationData, 'PF2E.PriceLabel', {}).replace(':','')}>{priceString}</DetailRow>
+                        <DetailRow label={localize(localizationData, 'PF2E.Item.Physical.Bulk.Label', {})}>{formatBulk(system.bulk, localizationData) ?? 'N/A'}</DetailRow>
                         {(type === 'weapon' || type === 'armor') && (
-                            <DetailRow label="Runes">
-                                <div className="flex flex-col gap-1 mt-1 text-sm">
-                                    {potencyBonus > 0 && <span>• +{potencyBonus} {type === 'weapon' ? 'Weapon' : 'Armor'} Potency</span>}
-                                    {strikingBonus > 0 && <span>• {getStrikingRuneName(strikingBonus)}</span>}
-                                    {resilientBonus > 0 && <span>• {getResilientRuneName(resilientBonus)}</span>}
-                                    {(potencyBonus === 0 && strikingBonus === 0 && resilientBonus === 0) && <span className="text-foundry-text-muted italic">None</span>}
-                                </div>
-                            </DetailRow>
+                            <div className="sm:col-span-2">
+                                <DetailRow label="Руны">
+                                    <div className="flex flex-col gap-1 mt-1 text-sm">
+                                        {potencyBonus > 0 && <span>• {localize(localizationData, type === 'weapon' ? `PF2E.WeaponPotencyRune${potencyBonus}`: `PF2E.ArmorPotencyRune${potencyBonus}`)}</span>}
+                                        {strikingBonus > 0 && <span>• {getStrikingRuneName(strikingBonus, localizationData)}</span>}
+                                        {resilientBonus > 0 && <span>• {getResilientRuneName(resilientBonus, localizationData)}</span>}
+                                        {(potencyBonus === 0 && strikingBonus === 0 && resilientBonus === 0) && <span className="text-foundry-text-muted italic">{localize(localizationData, 'PF2E.NoneOption')}</span>}
+                                    </div>
+                                </DetailRow>
+                            </div>
                         )}
                     </div>
-                </aside>
-
-                {/* Right Column */}
-                <article className="md:col-span-2">
-                     <div className="bg-foundry-dark p-4 rounded-md border border-foundry-light">
-                        <h3 className="text-lg font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2">Description</h3>
-                        {renderDescription(system.description.value, localizationData)}
-                        {renderItemDetails()}
-                    </div>
+                    
+                    <h3 className="text-lg font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2">{localize(localizationData, 'PF2E.HazardDescriptionLabel', {})}</h3>
+                    {renderDescription(system.description.value, localizationData)}
+                    {renderItemDetails()}
                 </article>
             </main>
         </div>

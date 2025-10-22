@@ -4,7 +4,7 @@
  * @param {string} path The dot-separated path.
  * @returns {string | undefined} The resolved value, or undefined if not found.
  */
-function resolvePath(object: any, path: string): string | undefined {
+export function resolvePath(object: any, path: string): string | undefined {
     if (!object || typeof path !== 'string') {
         return undefined;
     }
@@ -27,6 +27,52 @@ function resolvePath(object: any, path: string): string | undefined {
     return undefined;
 }
 
+export function localize(localizationData: Record<string, any> | null, key: string, replacements?: Record<string, string | number>): string {
+    if (!localizationData) {
+        if (key.includes('.')) {
+            const fallback = key.split('.').pop() ?? key;
+            return fallback.charAt(0).toUpperCase() + fallback.slice(1);
+        }
+        return key;
+    }
+    let translation = resolvePath(localizationData, key);
+    if (!translation) return key;
+    
+    if (replacements) {
+        Object.entries(replacements).forEach(([k, v]) => {
+            const regex = new RegExp(`{${k}}`, 'g');
+            translation = translation!.replace(regex, String(v));
+        });
+    }
+    return translation!;
+};
+
+export const formatPrice = (price: { value: { pp?: number, gp?: number, sp?: number, cp?: number } } | undefined, localizationData: Record<string, any> | null): string => {
+    if (!price?.value) return '—';
+    const parts = [];
+    if (price.value.pp) parts.push(`${price.value.pp} ${localize(localizationData, 'PF2E.CurrencyAbbreviations.pp')}`);
+    if (price.value.gp) parts.push(`${price.value.gp} ${localize(localizationData, 'PF2E.CurrencyAbbreviations.gp')}`);
+    if (price.value.sp) parts.push(`${price.value.sp} ${localize(localizationData, 'PF2E.CurrencyAbbreviations.sp')}`);
+    if (price.value.cp) parts.push(`${price.value.cp} ${localize(localizationData, 'PF2E.CurrencyAbbreviations.cp')}`);
+    return parts.join(', ') || '—';
+};
+
+export const formatBulk = (bulk: { value: number } | undefined, localizationData: Record<string, any> | null): string => {
+    if (!bulk) return '—';
+    if (bulk.value === 0.1) return localize(localizationData, 'PF2E.Item.Physical.Bulk.Light.ShortLabel') ?? 'Л';
+    if (bulk.value === 0) return '—';
+    return String(bulk.value);
+};
+
+/**
+ * Converts a kebab-case or snake_case string to PascalCase.
+ * e.g., 'range-increment-60' -> 'RangeIncrement60'
+ * e.g., 'versatile-s' -> 'VersatileS'
+ */
+export const slugToPascalCase = (slug: string): string => {
+    return slug.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+};
+
 
 /**
  * Processes a string containing Foundry VTT's special syntax and transforms it into formatted HTML.
@@ -46,13 +92,18 @@ export const processFoundryTags = (content: string | undefined, pageIds: string[
         result = result.replace(/@Localize\[(.*?)\]/g, (match, key) => {
             const trimmedKey = key.trim(); // Trim whitespace from the key
             const translation = resolvePath(localizationData, trimmedKey);
-            if (translation) {
+            if (translation !== undefined) {
                 // Recursively process the translated content to handle nested tags like @UUID.
                 return processFoundryTags(translation, pageIds, localizationData);
             }
             return `<strong>${trimmedKey}</strong>`; // Fallback if key not found
         });
     }
+
+    // Rule for @Compendium links: replace with just the link text.
+    result = result.replace(/@Compendium\[.*?\]\{(.*?)\}/g, (match, linkText) => {
+        return linkText;
+    });
 
     const pageIdSet = new Set(pageIds);
 
@@ -78,8 +129,20 @@ export const processFoundryTags = (content: string | undefined, pageIds: string[
     // Rule for other UUIDs: @UUID[...]{...} -> <strong>{...}</strong>
     result = result.replace(/@UUID\[.*?\]\{(.*?)\}/g, '<strong>$1</strong>');
     
-    // Rule for Traits: @Trait[...]{...} or @Traits[...]{...} -> {...}
-    result = result.replace(/@Traits?\[.*?\]\{(.*?)\}/g, '$1');
+    // Rule for Traits: @Trait[...]{...} or @Traits[...]{...} -> `label` with tooltip
+    result = result.replace(/@Traits?\[([^\]]*)\](?:\{(.*?)\})?/g, (match, key, label) => {
+        const pascalKey = slugToPascalCase(key);
+        const displayLabel = label ?? localize(localizationData, `PF2E.Trait${pascalKey}`) ?? pascalKey;
+        const descriptionKey = `PF2E.TraitDescription${pascalKey}`;
+        const description = (localizationData && resolvePath(localizationData, descriptionKey)) || '';
+
+        // Sanitize description for the title attribute.
+        const sanitizedDescription = description
+            .replace(/<[^>]*>/g, '') // Strip all HTML tags
+            .replace(/"/g, '&quot;'); // Escape quotes
+        return `<span class="trait-tooltip" title="${sanitizedDescription}"><code class="trait-code">${displayLabel}</code></span>`;
+    });
+
 
     // Rule for Conditions: @Condition[...]{...} -> <em>{...}</em>
     result = result.replace(/@Condition\[.*?\]\{(.*?)\}/g, '<em>$1</em>');
@@ -170,28 +233,17 @@ export const processFoundryTags = (content: string | undefined, pageIds: string[
            }
         });
 
-        const saveTypes = ['reflex', 'fortitude', 'will'];
-        const type = checkValues.type?.toLowerCase();
+        const type = checkValues.type;
 
-        if (type && saveTypes.includes(type) && checkValues.dc) {
+        // Generalized rule for any check with a type and DC
+        if (type && checkValues.dc) {
             let output = "";
             if (checkValues.basic === 'true') {
                 output += 'Basic_';
             }
-            const saveType = checkValues.type.charAt(0).toUpperCase() + checkValues.type.slice(1);
-            output += `${saveType}_DC${checkValues.dc}`;
-            return output;
-        }
-        
-        // Revised default behavior for other checks.
-        let fallbackText = "";
-        if (checkValues.basic === 'true') fallbackText += "Basic ";
-        if (checkValues.type) fallbackText += `${checkValues.type.charAt(0).toUpperCase() + checkValues.type.slice(1)} `;
-        if (checkValues.dc) fallbackText += `DC ${checkValues.dc}`;
-        
-        fallbackText = fallbackText.trim();
-        if (fallbackText) {
-            return `<strong>${fallbackText}</strong>`;
+            const formattedType = type.charAt(0).toUpperCase() + type.slice(1);
+            output += `${formattedType}_DC${checkValues.dc}`;
+            return `<strong>${output}</strong>`;
         }
 
         // Ultimate fallback for unparsable content

@@ -41,6 +41,7 @@ const App: React.FC = () => {
     const [activeRightTab, setActiveRightTab] = useState<'journals' | 'actors' | 'items' | 'worlds'>('journals');
     
     const [error, setError] = useState<string>('');
+    const [searchQuery, setSearchQuery] = useState<string>('');
     
     // State for Journals
     const [isCreatingJournalFolder, setIsCreatingJournalFolder] = useState<boolean>(false);
@@ -111,6 +112,18 @@ const App: React.FC = () => {
     
     const filedItemIds = useMemo(() => new Set(itemFolders.flatMap(f => f.itemIds)), [itemFolders]);
     const unfiledItems = useMemo(() => items.filter(i => !filedItemIds.has(i.id)), [items, filedItemIds]);
+
+    const searchResults = useMemo(() => {
+        if (!searchQuery.trim()) {
+            return { journals: [], actors: [], items: [] };
+        }
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        return {
+            journals: journals.filter(j => j.name.toLowerCase().includes(lowerCaseQuery)),
+            actors: actors.filter(a => a.name.toLowerCase().includes(lowerCaseQuery)),
+            items: items.filter(i => i.name.toLowerCase().includes(lowerCaseQuery)),
+        };
+    }, [searchQuery, journals, actors, items]);
 
 
     const handleFileSelect = useCallback((file: File) => {
@@ -439,8 +452,8 @@ const App: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-foundry-dark font-sans flex flex-col">
-            <main className="flex-grow grid grid-cols-1 lg:grid-cols-10 gap-4 p-4 h-screen">
-                <div className="lg:col-span-7 flex flex-col bg-foundry-mid rounded-lg border border-foundry-light overflow-hidden">
+            <main className="flex-grow grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 h-screen">
+                <div className="lg:col-span-4 flex flex-col bg-foundry-mid rounded-lg border border-foundry-light overflow-hidden">
                     {openTabs.length > 0 ? (
                         <>
                             <div className="flex-shrink-0 bg-foundry-dark border-b border-foundry-light">
@@ -472,108 +485,181 @@ const App: React.FC = () => {
                     )}
                 </div>
 
-                <div className="lg:col-span-3 flex flex-col bg-foundry-mid rounded-lg border border-foundry-light overflow-hidden">
+                <div className="lg:col-span-1 flex flex-col bg-foundry-mid rounded-lg border border-foundry-light overflow-hidden">
                     <header className="bg-foundry-dark p-4 border-b border-foundry-light shadow-md text-center">
                         <h1 className="text-xl font-bold text-foundry-accent">Foundry VTT Viewer</h1>
+                        <div className="relative mt-4">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Поиск..."
+                                className="w-full bg-foundry-dark border border-foundry-light rounded-md p-2 pl-4 pr-8 text-sm focus:ring-1 focus:ring-foundry-accent focus:outline-none"
+                            />
+                            {searchQuery && (
+                                <button 
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-foundry-text-muted hover:text-foundry-text text-xl"
+                                    aria-label="Clear search"
+                                >
+                                    &times;
+                                </button>
+                            )}
+                        </div>
                     </header>
 
-                    <div className="flex-shrink-0 border-b border-foundry-light">
-                        <nav className="flex justify-around">
-                           <RightTabButton tabId="journals" label="Журналы" />
-                           <RightTabButton tabId="actors" label="Актеры" />
-                           <RightTabButton tabId="items" label="Предметы" />
-                           <RightTabButton tabId="worlds" label="Миры" />
-                        </nav>
-                    </div>
-
                     <div className="flex-grow overflow-hidden">
-                        
-                        {['journals', 'actors', 'items'].includes(activeRightTab) && (
-                           <div className="p-4 flex flex-col h-full">
-                                {activeRightTab === 'journals' && (
-                                    <div className="space-x-2 mb-4">
-                                        <button onClick={() => setIsCreatingJournalFolder(true)} className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md text-sm hover:bg-foundry-accent hover:text-white transition-colors">Создать папку</button>
-                                        <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-foundry-accent text-white rounded-md text-sm hover:bg-orange-500 transition-colors">Создать журнал</button>
+                        {searchQuery.trim() ? (
+                            <div className="p-4 overflow-y-auto h-full">
+                                {(searchResults.journals.length === 0 && searchResults.actors.length === 0 && searchResults.items.length === 0) ? (
+                                    <p className="text-foundry-text-muted text-center pt-8">Ничего не найдено.</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {searchResults.journals.length > 0 && (
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-foundry-text-muted uppercase tracking-wider mb-2">Журналы</h3>
+                                                <ul>
+                                                    {searchResults.journals.map(j => (
+                                                        <li key={j.id}>
+                                                            <button onClick={() => { handleOpenItem(j.id, 'journal'); setSearchQuery(''); }} className="w-full text-left p-2 rounded-md hover:bg-foundry-light transition-colors">
+                                                                {j.name}
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {searchResults.actors.length > 0 && (
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-foundry-text-muted uppercase tracking-wider mb-2">Актеры</h3>
+                                                <ul>
+                                                    {searchResults.actors.map(a => (
+                                                        <li key={a.id}>
+                                                            <button onClick={() => { handleOpenItem(a.id, 'actor'); setSearchQuery(''); }} className="w-full text-left p-2 rounded-md hover:bg-foundry-light transition-colors">
+                                                                {a.name}
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {searchResults.items.length > 0 && (
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-foundry-text-muted uppercase tracking-wider mb-2">Предметы</h3>
+                                                <ul>
+                                                    {searchResults.items.map(i => (
+                                                        <li key={i.id}>
+                                                            <button onClick={() => { handleOpenItem(i.id, 'item'); setSearchQuery(''); }} className="w-full text-left p-2 rounded-md hover:bg-foundry-light transition-colors">
+                                                                {i.name}
+                                                            </button>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
-                                {activeRightTab === 'actors' && (
-                                    <div className="space-x-2 mb-4">
-                                        <button onClick={() => setIsCreatingActorFolder(true)} className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md text-sm hover:bg-foundry-accent hover:text-white transition-colors">Создать папку</button>
-                                        <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-foundry-accent text-white rounded-md text-sm hover:bg-orange-500 transition-colors">Создать актера</button>
-                                    </div>
-                                )}
-                                {activeRightTab === 'items' && (
-                                    <div className="space-x-2 mb-4">
-                                        <button onClick={() => setIsCreatingItemFolder(true)} className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md text-sm hover:bg-foundry-accent hover:text-white transition-colors">Создать папку</button>
-                                        <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-foundry-accent text-white rounded-md text-sm hover:bg-orange-500 transition-colors">Создать предмет</button>
-                                    </div>
-                                )}
-                                <input type="file" ref={fileInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleFileSelect(e.target.files[0]); e.target.value = ''; }} />
-
-                                <div className="flex-grow overflow-y-auto border-t border-foundry-light pt-2"
-                                  onDragOver={(e) => e.preventDefault()}
-                                  onDragEnter={() => {
-                                      if (activeRightTab === 'journals' && draggedJournalId) setJournalDropTargetId('root');
-                                      else if (activeRightTab === 'actors' && draggedActorId) setActorDropTargetId('root');
-                                      else if (activeRightTab === 'items' && draggedItemId) setItemDropTargetId('root');
-                                  }}
-                                  onDrop={() => { handleDrop(null, activeRightTab.slice(0, -1) as 'journal' | 'actor' | 'item'); }}>
-                                  
-                                  {error && <div className="mb-2 text-red-400 bg-red-900/50 p-2 rounded-md text-sm">{error}</div>}
-                                  
-                                  {(activeRightTab === 'journals' ? isCreatingJournalFolder : (activeRightTab === 'actors' ? isCreatingActorFolder : isCreatingItemFolder)) && (
-                                    <div className="p-2 mb-2">
-                                      <input 
-                                        ref={activeRightTab === 'journals' ? newJournalFolderInputRef : (activeRightTab === 'actors' ? newActorFolderInputRef : newItemFolderInputRef)} 
-                                        type="text"
-                                        value={activeRightTab === 'journals' ? newJournalFolderName : (activeRightTab === 'actors' ? newActorFolderName : newItemFolderName)}
-                                        onChange={(e) => {
-                                            if (activeRightTab === 'journals') setNewJournalFolderName(e.target.value);
-                                            else if (activeRightTab === 'actors') setNewActorFolderName(e.target.value);
-                                            else setNewItemFolderName(e.target.value);
-                                        }}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder(activeRightTab.slice(0, -1) as 'journal'|'actor'|'item')}
-                                        onBlur={() => handleCreateFolder(activeRightTab.slice(0, -1) as 'journal'|'actor'|'item')}
-                                        placeholder="Folder name..."
-                                        className="w-full bg-foundry-dark border border-foundry-light rounded-md p-1.5 text-sm focus:ring-1 focus:ring-foundry-accent focus:outline-none"/>
-                                    </div>
-                                  )}
-                                  
-                                  {renderItemList(activeRightTab.slice(0, -1) as 'journal' | 'actor' | 'item')}
-
-                                  {(activeRightTab === 'journals' ? journals : (activeRightTab === 'actors' ? actors : items)).length === 0 && !(activeRightTab === 'journals' ? isCreatingJournalFolder : (activeRightTab === 'actors' ? isCreatingActorFolder : isCreatingItemFolder)) && (
-                                    <p className="text-foundry-text-muted text-sm text-center pt-8">No {activeRightTab} loaded.</p>
-                                  )}
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex-shrink-0 border-b border-foundry-light">
+                                    <nav className="flex justify-around">
+                                       <RightTabButton tabId="journals" label="Журналы" />
+                                       <RightTabButton tabId="actors" label="Актеры" />
+                                       <RightTabButton tabId="items" label="Предметы" />
+                                       <RightTabButton tabId="worlds" label="Миры" />
+                                    </nav>
                                 </div>
-                           </div>
-                        )}
+                                <div className="flex-grow overflow-hidden">
+                                    {['journals', 'actors', 'items'].includes(activeRightTab) && (
+                                       <div className="p-4 flex flex-col h-full">
+                                            {activeRightTab === 'journals' && (
+                                                <div className="space-x-2 mb-4">
+                                                    <button onClick={() => setIsCreatingJournalFolder(true)} className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md text-sm hover:bg-foundry-accent hover:text-white transition-colors">Создать папку</button>
+                                                    <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-foundry-accent text-white rounded-md text-sm hover:bg-orange-500 transition-colors">Создать журнал</button>
+                                                </div>
+                                            )}
+                                            {activeRightTab === 'actors' && (
+                                                <div className="space-x-2 mb-4">
+                                                    <button onClick={() => setIsCreatingActorFolder(true)} className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md text-sm hover:bg-foundry-accent hover:text-white transition-colors">Создать папку</button>
+                                                    <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-foundry-accent text-white rounded-md text-sm hover:bg-orange-500 transition-colors">Создать актера</button>
+                                                </div>
+                                            )}
+                                            {activeRightTab === 'items' && (
+                                                <div className="space-x-2 mb-4">
+                                                    <button onClick={() => setIsCreatingItemFolder(true)} className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md text-sm hover:bg-foundry-accent hover:text-white transition-colors">Создать папку</button>
+                                                    <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-foundry-accent text-white rounded-md text-sm hover:bg-orange-500 transition-colors">Создать предмет</button>
+                                                </div>
+                                            )}
+                                            <input type="file" ref={fileInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleFileSelect(e.target.files[0]); e.target.value = ''; }} />
 
-                        {activeRightTab === 'worlds' && (
-                           <div className="p-4 space-y-4">
-                               <div>
-                                   <h3 className="font-semibold text-foundry-text mb-2">Сохранить Мир</h3>
-                                   <p className="text-sm text-foundry-text-muted mb-3">Save all loaded journals, actors, and items into a single file.</p>
-                                   <button onClick={handleSaveWorld} disabled={journals.length === 0 && actors.length === 0 && items.length === 0} className="w-full px-4 py-2 bg-foundry-accent text-white font-semibold rounded-md hover:bg-orange-500 transition-colors disabled:bg-foundry-light disabled:cursor-not-allowed">
-                                       Save World
-                                   </button>
-                               </div>
-                               <div className="border-t border-foundry-light pt-4">
-                                   <h3 className="font-semibold text-foundry-text mb-2">Загрузить Мир</h3>
-                                   <p className="text-sm text-foundry-text-muted mb-3">Load a previously saved world file to restore your workspace.</p>
-                                   <button onClick={() => worldInputRef.current?.click()} className="w-full px-4 py-2 bg-foundry-light text-foundry-text font-semibold rounded-md hover:bg-foundry-accent hover:text-white transition-colors">
-                                       Load World
-                                   </button>
-                                   <input type="file" ref={worldInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleLoadWorldFile(e.target.files[0]); e.target.value = ''; }} />
-                               </div>
-                               <div className="border-t border-foundry-light pt-4">
-                                   <h3 className="font-semibold text-foundry-text mb-2">Загрузить локализацию</h3>
-                                   <p className="text-sm text-foundry-text-muted mb-3">Загрузите JSON-файл локализации, чтобы заменить ключи (например, @Localize[...]) на переведенный текст.</p>
-                                   <button onClick={() => localizationInputRef.current?.click()} className="w-full px-4 py-2 bg-foundry-light text-foundry-text font-semibold rounded-md hover:bg-foundry-accent hover:text-white transition-colors">
-                                       Загрузить файл локализации
-                                   </button>
-                                   <input type="file" ref={localizationInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleLoadLocalizationFile(e.target.files[0]); e.target.value = ''; }} />
-                               </div>
-                           </div>
+                                            <div className="flex-grow overflow-y-auto border-t border-foundry-light pt-2"
+                                              onDragOver={(e) => e.preventDefault()}
+                                              onDragEnter={() => {
+                                                  if (activeRightTab === 'journals' && draggedJournalId) setJournalDropTargetId('root');
+                                                  else if (activeRightTab === 'actors' && draggedActorId) setActorDropTargetId('root');
+                                                  else if (activeRightTab === 'items' && draggedItemId) setItemDropTargetId('root');
+                                              }}
+                                              onDrop={() => { handleDrop(null, activeRightTab.slice(0, -1) as 'journal' | 'actor' | 'item'); }}>
+                                              
+                                              {error && <div className="mb-2 text-red-400 bg-red-900/50 p-2 rounded-md text-sm">{error}</div>}
+                                              
+                                              {(activeRightTab === 'journals' ? isCreatingJournalFolder : (activeRightTab === 'actors' ? isCreatingActorFolder : isCreatingItemFolder)) && (
+                                                <div className="p-2 mb-2">
+                                                  <input 
+                                                    ref={activeRightTab === 'journals' ? newJournalFolderInputRef : (activeRightTab === 'actors' ? newActorFolderInputRef : newItemFolderInputRef)} 
+                                                    type="text"
+                                                    value={activeRightTab === 'journals' ? newJournalFolderName : (activeRightTab === 'actors' ? newActorFolderName : newItemFolderName)}
+                                                    onChange={(e) => {
+                                                        if (activeRightTab === 'journals') setNewJournalFolderName(e.target.value);
+                                                        else if (activeRightTab === 'actors') setNewActorFolderName(e.target.value);
+                                                        else setNewItemFolderName(e.target.value);
+                                                    }}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder(activeRightTab.slice(0, -1) as 'journal'|'actor'|'item')}
+                                                    onBlur={() => handleCreateFolder(activeRightTab.slice(0, -1) as 'journal'|'actor'|'item')}
+                                                    placeholder="Folder name..."
+                                                    className="w-full bg-foundry-dark border border-foundry-light rounded-md p-1.5 text-sm focus:ring-1 focus:ring-foundry-accent focus:outline-none"/>
+                                                </div>
+                                              )}
+                                              
+                                              {renderItemList(activeRightTab.slice(0, -1) as 'journal' | 'actor' | 'item')}
+
+                                              {(activeRightTab === 'journals' ? journals : (activeRightTab === 'actors' ? actors : items)).length === 0 && !(activeRightTab === 'journals' ? isCreatingJournalFolder : (activeRightTab === 'actors' ? isCreatingActorFolder : isCreatingItemFolder)) && (
+                                                <p className="text-foundry-text-muted text-sm text-center pt-8">No {activeRightTab} loaded.</p>
+                                              )}
+                                            </div>
+                                       </div>
+                                    )}
+
+                                    {activeRightTab === 'worlds' && (
+                                       <div className="p-4 space-y-4">
+                                           <div>
+                                               <h3 className="font-semibold text-foundry-text mb-2">Сохранить Мир</h3>
+                                               <p className="text-sm text-foundry-text-muted mb-3">Save all loaded journals, actors, and items into a single file.</p>
+                                               <button onClick={handleSaveWorld} disabled={journals.length === 0 && actors.length === 0 && items.length === 0} className="w-full px-4 py-2 bg-foundry-accent text-white font-semibold rounded-md hover:bg-orange-500 transition-colors disabled:bg-foundry-light disabled:cursor-not-allowed">
+                                                   Save World
+                                               </button>
+                                           </div>
+                                           <div className="border-t border-foundry-light pt-4">
+                                               <h3 className="font-semibold text-foundry-text mb-2">Загрузить Мир</h3>
+                                               <p className="text-sm text-foundry-text-muted mb-3">Load a previously saved world file to restore your workspace.</p>
+                                               <button onClick={() => worldInputRef.current?.click()} className="w-full px-4 py-2 bg-foundry-light text-foundry-text font-semibold rounded-md hover:bg-foundry-accent hover:text-white transition-colors">
+                                                   Load World
+                                               </button>
+                                               <input type="file" ref={worldInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleLoadWorldFile(e.target.files[0]); e.target.value = ''; }} />
+                                           </div>
+                                           <div className="border-t border-foundry-light pt-4">
+                                               <h3 className="font-semibold text-foundry-text mb-2">Загрузить локализацию</h3>
+                                               <p className="text-sm text-foundry-text-muted mb-3">Загрузите JSON-файл локализации, чтобы заменить ключи (например, @Localize[...]) на переведенный текст.</p>
+                                               <button onClick={() => localizationInputRef.current?.click()} className="w-full px-4 py-2 bg-foundry-light text-foundry-text font-semibold rounded-md hover:bg-foundry-accent hover:text-white transition-colors">
+                                                   Загрузить файл локализации
+                                               </button>
+                                               <input type="file" ref={localizationInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleLoadLocalizationFile(e.target.files[0]); e.target.value = ''; }} />
+                                           </div>
+                                       </div>
+                                    )}
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>

@@ -182,6 +182,45 @@
           filter: brightness(1.2);
       }
 
+      /* Trait and Code styling */
+      .trait-code, .journal-page-content code {
+        background-color: #3c3c3c; /* foundry-light */
+        color: #f0f0f0;
+        padding: 0.2em 0.5em;
+        margin: 0 0.1em;
+        border-radius: 0.25rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.8em;
+        text-transform: uppercase;
+        display: inline-block;
+        white-space: nowrap;
+      }
+      .trait-tooltip {
+        cursor: help;
+        border-bottom: 1px dotted #a0a0a0; /* foundry-text-muted */
+        text-decoration: none;
+      }
+       .trait-tooltip code {
+        background-color: transparent;
+        padding: 0;
+        margin: 0;
+        border: none;
+      }
+      .action-glyph {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 1.5em;
+          height: 1.5em;
+          border: 1.5px solid #f0f0f0;
+          border-radius: 50%;
+          font-size: 0.8em;
+          font-weight: bold;
+          color: #f0f0f0;
+          vertical-align: middle;
+          font-family: serif;
+          margin-left: 0.5rem;
+      }
     </style>
   <script type="importmap">
 {
