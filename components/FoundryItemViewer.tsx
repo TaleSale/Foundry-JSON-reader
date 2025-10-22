@@ -6,6 +6,7 @@ interface FoundryItemViewerProps {
   data: any;
   onOpenActorByName: (actorName: string) => void;
   onOpenItemByName: (itemName: string) => void;
+  localizationData: Record<string, any> | null;
 }
 
 const TraitPill: React.FC<{ trait: string }> = ({ trait }) => (
@@ -19,9 +20,9 @@ const DetailRow: React.FC<{ label: string; children: React.ReactNode }> = ({ lab
     </div>
 );
 
-const renderDescription = (desc: string) => {
+const renderDescription = (desc: string, localizationData: Record<string, any> | null) => {
     if (!desc) return null;
-    const processed = processFoundryTags(desc, []);
+    const processed = processFoundryTags(desc, [], localizationData);
     return <div className="text-sm text-foundry-text journal-page-content" dangerouslySetInnerHTML={{ __html: processed }} />;
 };
 
@@ -87,7 +88,7 @@ const ArmorDetails: React.FC<{ system: any }> = ({ system }) => {
     );
 };
 
-const ConsumableDetails: React.FC<{ system: any }> = ({ system }) => (
+const ConsumableDetails: React.FC<{ system: any, localizationData: Record<string, any> | null }> = ({ system, localizationData }) => (
     <>
         <h4 className="text-md font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2 mt-4">Consumable Details</h4>
         <div className="text-sm">
@@ -96,7 +97,7 @@ const ConsumableDetails: React.FC<{ system: any }> = ({ system }) => (
         {system.spell && (
             <div className="mt-4 p-3 bg-foundry-dark rounded-md">
                 <h5 className="font-bold">Embedded Spell: {system.spell.name}</h5>
-                {renderDescription(system.spell.system.description.value)}
+                {renderDescription(system.spell.system.description.value, localizationData)}
             </div>
         )}
     </>
@@ -124,7 +125,7 @@ const EffectDetails: React.FC<{ system: any }> = ({ system }) => (
 );
 
 
-const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActorByName, onOpenItemByName }) => {
+const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, localizationData }) => {
     const [imgError, setImgError] = useState(false);
     const { system, type, name } = data;
     const itemViewerRef = useRef<HTMLDivElement>(null);
@@ -180,7 +181,7 @@ const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActor
         switch (data.type) {
             case 'weapon': return <WeaponDetails system={system} />;
             case 'armor': return <ArmorDetails system={system} />;
-            case 'consumable': return <ConsumableDetails system={system} />;
+            case 'consumable': return <ConsumableDetails system={system} localizationData={localizationData} />;
             case 'effect': return <EffectDetails system={system} />;
             case 'equipment': // Catches runes and other gear
                  return null;
@@ -254,7 +255,7 @@ const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActor
                 <article className="md:col-span-2">
                      <div className="bg-foundry-dark p-4 rounded-md border border-foundry-light">
                         <h3 className="text-lg font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2">Description</h3>
-                        {renderDescription(system.description.value)}
+                        {renderDescription(system.description.value, localizationData)}
                         {renderItemDetails()}
                     </div>
                 </article>

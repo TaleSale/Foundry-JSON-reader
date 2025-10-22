@@ -28,9 +28,10 @@ interface FoundryJournalViewerProps {
   data: any; // Using any as the full journal structure is complex
   onOpenActorByName: (actorName: string) => void;
   onOpenItemByName: (itemName: string) => void;
+  localizationData: Record<string, any> | null;
 }
 
-const FoundryJournalViewer: React.FC<FoundryJournalViewerProps> = ({ data, onOpenActorByName, onOpenItemByName }) => {
+const FoundryJournalViewer: React.FC<FoundryJournalViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, localizationData }) => {
   const journalData = data as JournalData;
   const [activePageIndex, setActivePageIndex] = useState(0);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -100,7 +101,7 @@ const FoundryJournalViewer: React.FC<FoundryJournalViewerProps> = ({ data, onOpe
   }
 
 
-  const processedContent = useMemo(() => processFoundryTags(activePage.text?.content || '', journalData.pages.map(p => p._id)), [activePage, journalData.pages]);
+  const processedContent = useMemo(() => processFoundryTags(activePage.text?.content || '', journalData.pages.map(p => p._id), localizationData), [activePage, journalData.pages, localizationData]);
 
   const renderPageContent = () => {
     if (activePage.type === 'text' && activePage.text?.content) {

@@ -6,6 +6,7 @@ interface FoundryActorViewerProps {
   data: any;
   onOpenActorByName: (actorName: string) => void;
   onOpenItemByName: (itemName: string) => void;
+  localizationData: Record<string, any> | null;
 }
 
 const StatBlock: React.FC<{ label: string; value: any; details?: string }> = ({ label, value, details }) => (
@@ -27,7 +28,7 @@ const SkillBlock: React.FC<{ label: string; value: number; }> = ({label, value})
     </div>
 )
 
-const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenActorByName, onOpenItemByName }) => {
+const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, localizationData }) => {
     const [activeTab, setActiveTab] = useState('main');
     const system = data.system;
     const actorViewerRef = useRef<HTMLDivElement>(null);
@@ -69,7 +70,7 @@ const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenAct
     }, [data.items]);
 
     const renderDescription = (desc: string) => {
-        const processed = processFoundryTags(desc, []);
+        const processed = processFoundryTags(desc, [], localizationData);
         return <div className="text-sm text-foundry-text-muted journal-page-content" dangerouslySetInnerHTML={{ __html: processed }} />;
     };
 
@@ -201,13 +202,13 @@ const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenAct
                                 {system.details.publicNotes && (
                                     <div>
                                         <h3 className="text-lg font-bold text-foundry-accent mb-2">Описание</h3>
-                                        <div dangerouslySetInnerHTML={{__html: processFoundryTags(system.details.publicNotes, [])}} />
+                                        <div dangerouslySetInnerHTML={{__html: processFoundryTags(system.details.publicNotes, [], localizationData)}} />
                                     </div>
                                 )}
                                 {system.details.privateNotes && (
                                     <div>
                                         <h3 className="text-lg font-bold text-foundry-accent mb-2">Личные заметки</h3>
-                                        <div dangerouslySetInnerHTML={{__html: processFoundryTags(system.details.privateNotes, [])}} />
+                                        <div dangerouslySetInnerHTML={{__html: processFoundryTags(system.details.privateNotes, [], localizationData)}} />
                                     </div>
                                 )}
                             </div>

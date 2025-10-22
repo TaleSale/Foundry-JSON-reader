@@ -1,10 +1,9 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { analyzeWorld, Journal, Actor, Item } from './services/geminiService';
+import { Journal, Actor, Item } from './services/geminiService';
 import FoundryJournalViewer from './components/FoundryJournalViewer';
 import FoundryActorViewer from './components/FoundryActorViewer';
 import FoundryItemViewer from './components/FoundryItemViewer';
-import AiChat, { ChatMessage } from './components/AiChat';
 
 interface Folder {
     id: string;
@@ -12,14 +11,8 @@ interface Folder {
     itemIds: string[];
 }
 
-interface Topic {
-  id: string;
-  name:string;
-  messages: ChatMessage[];
-}
-
 interface OpenTab {
-    id: string;
+    id:string;
     type: 'journal' | 'actor' | 'item';
 }
 
@@ -30,7 +23,7 @@ interface WorldData {
     actorFolders: Folder[];
     items: Item[];
     itemFolders: Folder[];
-    topics: Topic[];
+    localizationData?: Record<string, any> | null;
 }
 
 const App: React.FC = () => {
@@ -40,20 +33,15 @@ const App: React.FC = () => {
     const [actorFolders, setActorFolders] = useState<Folder[]>([]);
     const [items, setItems] = useState<Item[]>([]);
     const [itemFolders, setItemFolders] = useState<Folder[]>([]);
+    const [localizationData, setLocalizationData] = useState<Record<string, any> | null>(null);
 
     const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
     const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
-    const [activeRightTab, setActiveRightTab] = useState<'chat' | 'journals' | 'actors' | 'items' | 'worlds'>('journals');
+    const [activeRightTab, setActiveRightTab] = useState<'journals' | 'actors' | 'items' | 'worlds'>('journals');
     
-    const [topics, setTopics] = useState<Topic[]>([]);
-    const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [currentPrompt, setCurrentPrompt] = useState<string>('');
     const [error, setError] = useState<string>('');
     
-    const isAiConfigured = useMemo(() => !!process.env.API_KEY, []);
-
     // State for Journals
     const [isCreatingJournalFolder, setIsCreatingJournalFolder] = useState<boolean>(false);
     const [newJournalFolderName, setNewJournalFolderName] = useState<string>('');
@@ -77,10 +65,19 @@ const App: React.FC = () => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const worldInputRef = useRef<HTMLInputElement>(null);
+    const localizationInputRef = useRef<HTMLInputElement>(null);
     const newJournalFolderInputRef = useRef<HTMLInputElement>(null);
     const newActorFolderInputRef = useRef<HTMLInputElement>(null);
     const newItemFolderInputRef = useRef<HTMLInputElement>(null);
     
+    useEffect(() => {
+      // Load default localization on startup
+      fetch('./locales/ru.json')
+        .then(res => res.json())
+        .then(data => setLocalizationData(data))
+        .catch(err => console.error("Failed to load default localization:", err));
+    }, []);
+
     useEffect(() => {
       if (isCreatingJournalFolder) newJournalFolderInputRef.current?.focus();
     }, [isCreatingJournalFolder]);
@@ -106,11 +103,6 @@ const App: React.FC = () => {
         return null;
     }, [activeTab, journals, actors, items]);
     
-    const activeTopic = useMemo(() => {
-        if (!activeTopicId) return null;
-        return topics.find(t => t.id === activeTopicId) || null;
-    }, [topics, activeTopicId]);
-
     const filedJournalIds = useMemo(() => new Set(journalFolders.flatMap(f => f.itemIds)), [journalFolders]);
     const unfiledJournals = useMemo(() => journals.filter(j => !filedJournalIds.has(j.id)), [journals, filedJournalIds]);
     
@@ -303,44 +295,8 @@ const App: React.FC = () => {
 
     }, [draggedJournalId, draggedActorId, draggedItemId]);
 
-    const handleSubmitQuery = useCallback(async () => {
-        if (!currentPrompt.trim() || (journals.length === 0 && actors.length === 0 && items.length === 0)) return;
-        setError('');
-        const userMessage: ChatMessage = { role: 'user', content: currentPrompt };
-        
-        let targetTopicId = activeTopicId;
-        if (!targetTopicId) {
-            const newTopic: Topic = {
-                id: crypto.randomUUID(),
-                name: currentPrompt.split(' ').slice(0, 5).join(' ') + (currentPrompt.length > 30 ? '...' : ''),
-                messages: [userMessage],
-            };
-            setTopics(prev => [newTopic, ...prev]);
-            targetTopicId = newTopic.id;
-            setActiveTopicId(newTopic.id);
-        } else {
-             setTopics(prevTopics => prevTopics.map(t => t.id === targetTopicId ? { ...t, messages: [...t.messages, userMessage] } : t));
-        }
-        
-        const promptToSubmit = currentPrompt;
-        setCurrentPrompt('');
-        setIsLoading(true);
-
-        try {
-            const response = await analyzeWorld(journals, actors, items, promptToSubmit);
-            const aiMessage: ChatMessage = { role: 'model', content: response };
-            setTopics(prevTopics => prevTopics.map(t => t.id === targetTopicId ? { ...t, messages: [...t.messages, aiMessage] } : t));
-        } catch (err) {
-            const content = err instanceof Error ? err.message : 'An error occurred while communicating with the AI. Please try again.';
-            const errorMessage: ChatMessage = { role: 'error', content };
-            setTopics(prevTopics => prevTopics.map(t => t.id === targetTopicId ? { ...t, messages: [...t.messages, errorMessage] } : t));
-        } finally {
-            setIsLoading(false);
-        }
-    }, [currentPrompt, journals, actors, items, activeTopicId, topics]);
-
     const handleSaveWorld = useCallback(() => {
-        const worldData: WorldData = { journals, journalFolders, actors, actorFolders, items, itemFolders, topics };
+        const worldData: WorldData = { journals, journalFolders, actors, actorFolders, items, itemFolders, localizationData };
         const blob = new Blob([JSON.stringify(worldData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -350,7 +306,7 @@ const App: React.FC = () => {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }, [journals, journalFolders, actors, actorFolders, items, itemFolders, topics]);
+    }, [journals, journalFolders, actors, actorFolders, items, itemFolders, localizationData]);
 
     const handleLoadWorldFile = (file: File) => {
         if (file.type !== 'application/json') {
@@ -367,18 +323,33 @@ const App: React.FC = () => {
                     setActorFolders(data.actorFolders || []);
                     setItems(data.items || []);
                     setItemFolders(data.itemFolders || []);
-                    setTopics(data.topics || []);
+                    setLocalizationData(data.localizationData || null);
                     
                     setOpenJournalFolderIds((data.journalFolders || []).reduce((acc, f) => ({...acc, [f.id]: true}), {}));
                     setOpenActorFolderIds((data.actorFolders || []).reduce((acc, f) => ({...acc, [f.id]: true}), {}));
                     setOpenItemFolderIds((data.itemFolders || []).reduce((acc, f) => ({...acc, [f.id]: true}), {}));
                     
-                    setActiveTopicId(data.topics && data.topics.length > 0 ? data.topics[0].id : null);
                     setOpenTabs([]);
                     setActiveTabId(null);
                     setActiveRightTab('journals');
                 } else { alert('Invalid world file format.'); }
             } catch (err) { alert('Failed to parse world file.'); }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleLoadLocalizationFile = (file: File) => {
+        if (file.type !== 'application/json') {
+            alert('Invalid file type. Please upload a localization JSON file.'); return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target?.result as string);
+                setLocalizationData(data);
+            } catch (err) {
+                alert('Failed to parse localization file.');
+            }
         };
         reader.readAsText(file);
     };
@@ -489,9 +460,9 @@ const App: React.FC = () => {
                                     })}
                                 </nav>
                             </div>
-                            {activeItem && activeTab?.type === 'journal' && <FoundryJournalViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} />}
-                            {activeItem && activeTab?.type === 'actor' && <FoundryActorViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} />}
-                            {activeItem && activeTab?.type === 'item' && <FoundryItemViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} />}
+                            {activeItem && activeTab?.type === 'journal' && <FoundryJournalViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} localizationData={localizationData} />}
+                            {activeItem && activeTab?.type === 'actor' && <FoundryActorViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} localizationData={localizationData} />}
+                            {activeItem && activeTab?.type === 'item' && <FoundryItemViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} localizationData={localizationData} />}
                         </>
                     ) : (
                         <div className="flex flex-col h-full p-4 items-center justify-center text-center">
@@ -503,12 +474,11 @@ const App: React.FC = () => {
 
                 <div className="lg:col-span-3 flex flex-col bg-foundry-mid rounded-lg border border-foundry-light overflow-hidden">
                     <header className="bg-foundry-dark p-4 border-b border-foundry-light shadow-md text-center">
-                        <h1 className="text-xl font-bold text-foundry-accent">Foundry VTT Analyzer</h1>
+                        <h1 className="text-xl font-bold text-foundry-accent">Foundry VTT Viewer</h1>
                     </header>
 
                     <div className="flex-shrink-0 border-b border-foundry-light">
                         <nav className="flex justify-around">
-                           <RightTabButton tabId="chat" label="Чат" />
                            <RightTabButton tabId="journals" label="Журналы" />
                            <RightTabButton tabId="actors" label="Актеры" />
                            <RightTabButton tabId="items" label="Предметы" />
@@ -517,33 +487,6 @@ const App: React.FC = () => {
                     </div>
 
                     <div className="flex-grow overflow-hidden">
-                        {activeRightTab === 'chat' && (
-                            <div className="flex flex-col h-full">
-                                <div className="flex-shrink-0 p-3 border-b border-foundry-light">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h3 className="font-semibold text-foundry-text text-sm">Темы</h3>
-                                        <button onClick={() => setActiveTopicId(null)} className="px-2 py-1 bg-foundry-light text-foundry-text-muted rounded text-xs hover:bg-foundry-accent hover:text-white transition-colors" disabled={!isAiConfigured}>
-                                            + Новая тема
-                                        </button>
-                                    </div>
-                                    <div className="space-y-1 max-h-28 overflow-y-auto text-sm pr-2">
-                                        {topics.length === 0 && <p className="text-xs text-foundry-text-muted italic text-center">No topics yet.</p>}
-                                        {topics.map(topic => (
-                                            <div key={topic.id} className={`group flex items-center justify-between rounded p-1 cursor-pointer transition-colors ${activeTopicId === topic.id ? 'bg-foundry-accent/20' : 'hover:bg-foundry-light/50'}`}>
-                                                <button onClick={() => setActiveTopicId(topic.id)} className={`flex-grow text-left truncate ${activeTopicId === topic.id ? 'font-semibold text-foundry-accent' : ''}`}>
-                                                    {topic.name}
-                                                </button>
-                                                <button onClick={() => { if(window.confirm("Are you sure you want to delete this topic?")) { setTopics(p => p.filter(t => t.id !== topic.id)); if(activeTopicId === topic.id) setActiveTopicId(null); } }} title="Delete topic"
-                                                    className="ml-2 px-1 text-foundry-text-muted opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity">&times;</button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="flex-grow overflow-hidden">
-                                     <AiChat prompt={currentPrompt} setPrompt={setCurrentPrompt} onSubmit={handleSubmitQuery} chatHistory={activeTopic?.messages || []} isLoading={isLoading} isReady={journals.length > 0 || actors.length > 0 || items.length > 0} isAiConfigured={isAiConfigured} />
-                                </div>
-                            </div>
-                        )}
                         
                         {['journals', 'actors', 'items'].includes(activeRightTab) && (
                            <div className="p-4 flex flex-col h-full">
@@ -609,7 +552,7 @@ const App: React.FC = () => {
                            <div className="p-4 space-y-4">
                                <div>
                                    <h3 className="font-semibold text-foundry-text mb-2">Сохранить Мир</h3>
-                                   <p className="text-sm text-foundry-text-muted mb-3">Save all loaded journals, actors, items, and conversation topics into a single file.</p>
+                                   <p className="text-sm text-foundry-text-muted mb-3">Save all loaded journals, actors, and items into a single file.</p>
                                    <button onClick={handleSaveWorld} disabled={journals.length === 0 && actors.length === 0 && items.length === 0} className="w-full px-4 py-2 bg-foundry-accent text-white font-semibold rounded-md hover:bg-orange-500 transition-colors disabled:bg-foundry-light disabled:cursor-not-allowed">
                                        Save World
                                    </button>
@@ -621,6 +564,14 @@ const App: React.FC = () => {
                                        Load World
                                    </button>
                                    <input type="file" ref={worldInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleLoadWorldFile(e.target.files[0]); e.target.value = ''; }} />
+                               </div>
+                               <div className="border-t border-foundry-light pt-4">
+                                   <h3 className="font-semibold text-foundry-text mb-2">Загрузить локализацию</h3>
+                                   <p className="text-sm text-foundry-text-muted mb-3">Загрузите JSON-файл локализации, чтобы заменить ключи (например, @Localize[...]) на переведенный текст.</p>
+                                   <button onClick={() => localizationInputRef.current?.click()} className="w-full px-4 py-2 bg-foundry-light text-foundry-text font-semibold rounded-md hover:bg-foundry-accent hover:text-white transition-colors">
+                                       Загрузить файл локализации
+                                   </button>
+                                   <input type="file" ref={localizationInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleLoadLocalizationFile(e.target.files[0]); e.target.value = ''; }} />
                                </div>
                            </div>
                         )}
