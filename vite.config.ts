@@ -4,7 +4,16 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+
+    // Determine base path for GitHub Pages deployment.
+    // It's dynamically set from the GITHUB_REPOSITORY env var during the CI build.
+    // For local development, it defaults to '/'.
+    const base = process.env.GITHUB_REPOSITORY
+      ? `/${process.env.GITHUB_REPOSITORY.split('/')[1]}/`
+      : '/';
+
     return {
+      base: base, 
       server: {
         port: 3000,
         host: '0.0.0.0',
