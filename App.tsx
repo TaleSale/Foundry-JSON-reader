@@ -370,7 +370,7 @@ const App: React.FC = () => {
     const RightTabButton: React.FC<{tabId: string, label: string}> = ({ tabId, label }) => (
         <button
             onClick={() => setActiveRightTab(tabId as any)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
+            className={`px-2 py-2 text-sm font-medium transition-colors ${
                 activeRightTab === tabId
                     ? 'border-b-2 border-foundry-accent text-foundry-accent'
                     : 'border-b-2 border-transparent text-foundry-text-muted hover:text-foundry-text'
@@ -452,7 +452,7 @@ const App: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-foundry-dark font-sans flex flex-col">
-            <main className="flex-grow grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 h-screen">
+            <main className="flex-grow grid grid-cols-1 lg:grid-cols-5 gap-4 p-4">
                 <div className="lg:col-span-4 flex flex-col bg-foundry-mid rounded-lg border border-foundry-light overflow-hidden">
                     {openTabs.length > 0 ? (
                         <>
