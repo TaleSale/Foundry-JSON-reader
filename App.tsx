@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Journal, Actor, Item } from './services/geminiService';
 import FoundryJournalViewer from './components/FoundryJournalViewer';
@@ -23,8 +22,47 @@ interface WorldData {
     actorFolders: Folder[];
     items: Item[];
     itemFolders: Folder[];
-    localizationData?: Record<string, any> | null;
 }
+
+const deepSearch = (obj: any, query: string, visited = new Set()): boolean => {
+    if (obj === null || typeof obj !== 'object') {
+        return false;
+    }
+    if (visited.has(obj)) return false;
+    visited.add(obj);
+
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            const value = obj[key];
+            const valueType = typeof value;
+
+            if (valueType === 'string' || valueType === 'number') {
+                if (String(value).toLowerCase().includes(query)) {
+                    return true;
+                }
+            } else if (Array.isArray(value)) {
+                for (const item of value) {
+                    const itemType = typeof item;
+                    if (itemType === 'string' || itemType === 'number') {
+                         if (String(item).toLowerCase().includes(query)) {
+                            return true;
+                         }
+                    } else if (itemType === 'object') {
+                        if (deepSearch(item, query, visited)) {
+                            return true;
+                        }
+                    }
+                }
+            } else if (valueType === 'object') {
+                if (deepSearch(value, query, visited)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+};
+
 
 const App: React.FC = () => {
     const [journals, setJournals] = useState<Journal[]>([]);
@@ -66,10 +104,11 @@ const App: React.FC = () => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const worldInputRef = useRef<HTMLInputElement>(null);
-    const localizationInputRef = useRef<HTMLInputElement>(null);
     const newJournalFolderInputRef = useRef<HTMLInputElement>(null);
     const newActorFolderInputRef = useRef<HTMLInputElement>(null);
     const newItemFolderInputRef = useRef<HTMLInputElement>(null);
+    const longPressTimer = useRef<number | null>(null);
+    const longPressTriggered = useRef<boolean>(false);
     
     useEffect(() => {
       // Load default localization on startup
@@ -119,9 +158,9 @@ const App: React.FC = () => {
         }
         const lowerCaseQuery = searchQuery.toLowerCase();
         return {
-            journals: journals.filter(j => j.name.toLowerCase().includes(lowerCaseQuery)),
-            actors: actors.filter(a => a.name.toLowerCase().includes(lowerCaseQuery)),
-            items: items.filter(i => i.name.toLowerCase().includes(lowerCaseQuery)),
+            journals: journals.filter(j => j.name.toLowerCase().includes(lowerCaseQuery) || deepSearch(j.data, lowerCaseQuery)),
+            actors: actors.filter(a => a.name.toLowerCase().includes(lowerCaseQuery) || deepSearch(a.data, lowerCaseQuery)),
+            items: items.filter(i => i.name.toLowerCase().includes(lowerCaseQuery) || deepSearch(i.data, lowerCaseQuery)),
         };
     }, [searchQuery, journals, actors, items]);
 
@@ -309,7 +348,7 @@ const App: React.FC = () => {
     }, [draggedJournalId, draggedActorId, draggedItemId]);
 
     const handleSaveWorld = useCallback(() => {
-        const worldData: WorldData = { journals, journalFolders, actors, actorFolders, items, itemFolders, localizationData };
+        const worldData: WorldData = { journals, journalFolders, actors, actorFolders, items, itemFolders };
         const blob = new Blob([JSON.stringify(worldData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -319,7 +358,7 @@ const App: React.FC = () => {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }, [journals, journalFolders, actors, actorFolders, items, itemFolders, localizationData]);
+    }, [journals, journalFolders, actors, actorFolders, items, itemFolders]);
 
     const handleLoadWorldFile = (file: File) => {
         if (file.type !== 'application/json') {
@@ -336,7 +375,6 @@ const App: React.FC = () => {
                     setActorFolders(data.actorFolders || []);
                     setItems(data.items || []);
                     setItemFolders(data.itemFolders || []);
-                    setLocalizationData(data.localizationData || null);
                     
                     setOpenJournalFolderIds((data.journalFolders || []).reduce((acc, f) => ({...acc, [f.id]: true}), {}));
                     setOpenActorFolderIds((data.actorFolders || []).reduce((acc, f) => ({...acc, [f.id]: true}), {}));
@@ -351,32 +389,37 @@ const App: React.FC = () => {
         reader.readAsText(file);
     };
 
-    const handleLoadLocalizationFile = (file: File) => {
-        if (file.type !== 'application/json') {
-            alert('Invalid file type. Please upload a localization JSON file.'); return;
-        }
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const data = JSON.parse(event.target?.result as string);
-                setLocalizationData(data);
-            } catch (err) {
-                alert('Failed to parse localization file.');
-            }
-        };
-        reader.readAsText(file);
-    };
+    const handlePressStart = useCallback(() => {
+        longPressTriggered.current = false; // Reset trigger
+        longPressTimer.current = window.setTimeout(() => {
+            longPressTriggered.current = true;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 1000); // 2 seconds
+    }, []);
 
-    const RightTabButton: React.FC<{tabId: string, label: string}> = ({ tabId, label }) => (
+    const handlePressEnd = useCallback(() => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+            longPressTimer.current = null;
+        }
+        
+        // If the long press didn't fire, it was a click
+        if (!longPressTriggered.current) {
+            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+        }
+    }, []);
+
+    const RightTabButton: React.FC<{tabId: string, label: string, icon: React.ReactNode}> = ({ tabId, label, icon }) => (
         <button
             onClick={() => setActiveRightTab(tabId as any)}
-            className={`px-2 py-2 text-sm font-medium transition-colors ${
+            title={label}
+            className={`flex-1 flex justify-center items-center p-2 font-medium transition-colors ${
                 activeRightTab === tabId
                     ? 'border-b-2 border-foundry-accent text-foundry-accent'
                     : 'border-b-2 border-transparent text-foundry-text-muted hover:text-foundry-text'
             }`}
         >
-            {label}
+            {icon}
         </button>
     );
     
@@ -564,31 +607,71 @@ const App: React.FC = () => {
                             <>
                                 <div className="flex-shrink-0 border-b border-foundry-light">
                                     <nav className="flex justify-around">
-                                       <RightTabButton tabId="journals" label="Журналы" />
-                                       <RightTabButton tabId="actors" label="Актеры" />
-                                       <RightTabButton tabId="items" label="Предметы" />
-                                       <RightTabButton tabId="worlds" label="Миры" />
+                                       <RightTabButton tabId="journals" label="Журналы" icon={
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                            </svg>
+                                       } />
+                                       <RightTabButton tabId="actors" label="Актеры" icon={
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                            </svg>
+                                       } />
+                                       <RightTabButton tabId="items" label="Предметы" icon={
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                                            </svg>
+                                       } />
+                                       <RightTabButton tabId="worlds" label="Миры" icon={
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9V3m0 9a9 9 0 01-9-9" />
+                                            </svg>
+                                       } />
                                     </nav>
                                 </div>
                                 <div className="flex-grow overflow-hidden">
                                     {['journals', 'actors', 'items'].includes(activeRightTab) && (
                                        <div className="p-4 flex flex-col h-full">
                                             {activeRightTab === 'journals' && (
-                                                <div className="space-x-2 mb-4">
-                                                    <button onClick={() => setIsCreatingJournalFolder(true)} className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md text-sm hover:bg-foundry-accent hover:text-white transition-colors">Создать папку</button>
-                                                    <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-foundry-accent text-white rounded-md text-sm hover:bg-orange-500 transition-colors">Создать журнал</button>
+                                                <div className="flex space-x-2 mb-4">
+                                                    <button onClick={() => setIsCreatingJournalFolder(true)} title="Создать папку" className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md hover:bg-foundry-accent hover:text-white transition-colors flex items-center justify-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button onClick={() => fileInputRef.current?.click()} title="Создать журнал" className="px-3 py-1.5 bg-foundry-accent text-white rounded-md hover:bg-orange-500 transition-colors flex items-center justify-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
+                                                    </button>
                                                 </div>
                                             )}
                                             {activeRightTab === 'actors' && (
-                                                <div className="space-x-2 mb-4">
-                                                    <button onClick={() => setIsCreatingActorFolder(true)} className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md text-sm hover:bg-foundry-accent hover:text-white transition-colors">Создать папку</button>
-                                                    <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-foundry-accent text-white rounded-md text-sm hover:bg-orange-500 transition-colors">Создать актера</button>
+                                                <div className="flex space-x-2 mb-4">
+                                                    <button onClick={() => setIsCreatingActorFolder(true)} title="Создать папку" className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md hover:bg-foundry-accent hover:text-white transition-colors flex items-center justify-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button onClick={() => fileInputRef.current?.click()} title="Создать актера" className="px-3 py-1.5 bg-foundry-accent text-white rounded-md hover:bg-orange-500 transition-colors flex items-center justify-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
+                                                    </button>
                                                 </div>
                                             )}
                                             {activeRightTab === 'items' && (
-                                                <div className="space-x-2 mb-4">
-                                                    <button onClick={() => setIsCreatingItemFolder(true)} className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md text-sm hover:bg-foundry-accent hover:text-white transition-colors">Создать папку</button>
-                                                    <button onClick={() => fileInputRef.current?.click()} className="px-3 py-1.5 bg-foundry-accent text-white rounded-md text-sm hover:bg-orange-500 transition-colors">Создать предмет</button>
+                                                <div className="flex space-x-2 mb-4">
+                                                    <button onClick={() => setIsCreatingItemFolder(true)} title="Создать папку" className="px-3 py-1.5 bg-foundry-light text-foundry-text-muted rounded-md hover:bg-foundry-accent hover:text-white transition-colors flex items-center justify-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button onClick={() => fileInputRef.current?.click()} title="Создать предмет" className="px-3 py-1.5 bg-foundry-accent text-white rounded-md hover:bg-orange-500 transition-colors flex items-center justify-center">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                        </svg>
+                                                    </button>
                                                 </div>
                                             )}
                                             <input type="file" ref={fileInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleFileSelect(e.target.files[0]); e.target.value = ''; }} />
@@ -648,14 +731,6 @@ const App: React.FC = () => {
                                                </button>
                                                <input type="file" ref={worldInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleLoadWorldFile(e.target.files[0]); e.target.value = ''; }} />
                                            </div>
-                                           <div className="border-t border-foundry-light pt-4">
-                                               <h3 className="font-semibold text-foundry-text mb-2">Загрузить локализацию</h3>
-                                               <p className="text-sm text-foundry-text-muted mb-3">Загрузите JSON-файл локализации, чтобы заменить ключи (например, @Localize[...]) на переведенный текст.</p>
-                                               <button onClick={() => localizationInputRef.current?.click()} className="w-full px-4 py-2 bg-foundry-light text-foundry-text font-semibold rounded-md hover:bg-foundry-accent hover:text-white transition-colors">
-                                                   Загрузить файл локализации
-                                               </button>
-                                               <input type="file" ref={localizationInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleLoadLocalizationFile(e.target.files[0]); e.target.value = ''; }} />
-                                           </div>
                                        </div>
                                     )}
                                 </div>
@@ -664,6 +739,20 @@ const App: React.FC = () => {
                     </div>
                 </div>
             </main>
+            <button
+                onMouseDown={handlePressStart}
+                onMouseUp={handlePressEnd}
+                onMouseLeave={handlePressEnd}
+                onTouchStart={handlePressStart}
+                onTouchEnd={handlePressEnd}
+                onContextMenu={(e) => e.preventDefault()}
+                className="lg:hidden fixed bottom-4 right-4 z-50 p-3 rounded-full text-white bg-black/30 hover:bg-black/50 transition-all opacity-50 hover:opacity-100 shadow-lg"
+                title="Нажмите для прокрутки вниз, удерживайте для прокрутки вверх"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
         </div>
     );
 };

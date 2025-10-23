@@ -452,6 +452,7 @@ const InventoryTab: React.FC<{items: any[], localizationData: any, renderDescrip
 
 const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, localizationData }) => {
     const [activeTab, setActiveTab] = useState('main');
+    const [isSidebarVisible, setIsSidebarVisible] = useState(true);
     const system = data.system;
     const actorViewerRef = useRef<HTMLDivElement>(null);
 
@@ -560,7 +561,7 @@ const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenAct
     );
 
     return (
-        <div ref={actorViewerRef} className="bg-foundry-mid text-foundry-text h-full flex flex-col font-sans overflow-hidden">
+        <div ref={actorViewerRef} className="bg-foundry-mid text-foundry-text h-full flex flex-col font-sans overflow-hidden relative">
             {/* Header */}
             <header className="bg-foundry-dark p-3 border-b border-foundry-light flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-foundry-accent">{data.name}</h2>
@@ -576,42 +577,56 @@ const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenAct
                 </div>
             </header>
 
+            <button 
+                onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+                className="absolute top-20 left-2 z-10 p-2 rounded-full text-white bg-black/30 hover:bg-black/50 transition-all opacity-50 hover:opacity-100"
+                title={isSidebarVisible ? "Скрыть характеристики" : "Показать характеристики"}
+            >
+                 {isSidebarVisible ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                )}
+            </button>
+
             <div className="flex flex-grow overflow-hidden">
                 {/* Left Sidebar */}
-                <aside className="w-60 bg-foundry-dark p-3 space-y-3 overflow-y-auto flex-shrink-0">
-                    <StatBlock label={localize(localizationData, 'PF2E.ArmorClassShortLabel')} value={system.attributes.ac.value} />
-                    <StatBlock label={localize(localizationData, 'PF2E.HitPointsShortLabel')} value={system.attributes.hp.value} details={`max ${system.attributes.hp.max}`} />
-                    <StatBlock label={localize(localizationData, 'PF2E.Actor.Speed.Label')} value={system.attributes.speed.value} details={system.attributes.speed.otherSpeeds?.map((s:any) => `${s.type} ${s.value}`).join(', ')} />
-                    
-                    <div className="border-t border-foundry-light pt-2">
-                        <StatBlock label={localize(localizationData, 'PF2E.SavesFortitude')} value={system.saves.fortitude.value > 0 ? `+${system.saves.fortitude.value}` : system.saves.fortitude.value} />
-                        <StatBlock label={localize(localizationData, 'PF2E.SavesReflex')} value={system.saves.reflex.value > 0 ? `+${system.saves.reflex.value}` : system.saves.reflex.value} />
-                        <StatBlock label={localize(localizationData, 'PF2E.SavesWill')} value={system.saves.will.value > 0 ? `+${system.saves.will.value}` : system.saves.will.value} />
-                    </div>
+                <aside className={`transition-all duration-300 overflow-hidden ${isSidebarVisible ? 'w-60 p-3' : 'w-0 p-0'} bg-foundry-dark flex-shrink-0`}>
+                    <div className={`${isSidebarVisible ? 'block overflow-y-auto h-full space-y-3' : 'hidden'}`}>
+                        <StatBlock label={localize(localizationData, 'PF2E.ArmorClassShortLabel')} value={system.attributes.ac.value} />
+                        <StatBlock label={localize(localizationData, 'PF2E.HitPointsShortLabel')} value={system.attributes.hp.value} details={`max ${system.attributes.hp.max}`} />
+                        <StatBlock label={localize(localizationData, 'PF2E.Actor.Speed.Label')} value={system.attributes.speed.value} details={system.attributes.speed.otherSpeeds?.map((s:any) => `${s.type} ${s.value}`).join(', ')} />
+                        
+                        <div className="border-t border-foundry-light pt-2">
+                            <StatBlock label={localize(localizationData, 'PF2E.SavesFortitude')} value={system.saves.fortitude.value > 0 ? `+${system.saves.fortitude.value}` : system.saves.fortitude.value} />
+                            <StatBlock label={localize(localizationData, 'PF2E.SavesReflex')} value={system.saves.reflex.value > 0 ? `+${system.saves.reflex.value}` : system.saves.reflex.value} />
+                            <StatBlock label={localize(localizationData, 'PF2E.SavesWill')} value={system.saves.will.value > 0 ? `+${system.saves.will.value}` : system.saves.will.value} />
+                        </div>
 
-                    <div className="border-t border-foundry-light pt-2">
-                         <h3 className="font-bold text-foundry-accent mb-1">{localize(localizationData, 'PF2E.PerceptionLabel')}</h3>
-                         <SkillBlock label={localize(localizationData, 'PF2E.PerceptionLabel')} value={system.perception.mod} />
-                         <p className="text-xs text-foundry-text-muted pl-2">
-                            {system.perception.senses?.map((s: any) => s.type).join(', ')}
-                         </p>
-                    </div>
+                        <div className="border-t border-foundry-light pt-2">
+                             <h3 className="font-bold text-foundry-accent mb-1">{localize(localizationData, 'PF2E.PerceptionLabel')}</h3>
+                             <SkillBlock label={localize(localizationData, 'PF2E.PerceptionLabel')} value={system.perception.mod} />
+                             <p className="text-xs text-foundry-text-muted pl-2">
+                                {system.perception.senses?.map((s: any) => s.type).join(', ')}
+                             </p>
+                        </div>
 
-                    <div className="border-t border-foundry-light pt-2">
-                         <h3 className="font-bold text-foundry-accent mb-1">{localize(localizationData, 'PF2E.SkillsLabel')}</h3>
-                        {Object.entries(system.skills).map(([key, value]: [string, any]) => (
-                            <SkillBlock key={key} label={localize(localizationData, `PF2E.Skill.${key.charAt(0).toUpperCase() + key.slice(1)}`)} value={value.base} />
-                        ))}
-                    </div>
+                        <div className="border-t border-foundry-light pt-2">
+                             <h3 className="font-bold text-foundry-accent mb-1">{localize(localizationData, 'PF2E.SkillsLabel')}</h3>
+                            {Object.entries(system.skills).map(([key, value]: [string, any]) => (
+                                <SkillBlock key={key} label={localize(localizationData, `PF2E.Skill.${key.charAt(0).toUpperCase() + key.slice(1)}`)} value={value.base} />
+                            ))}
+                        </div>
 
-                     <div className="border-t border-foundry-light pt-2 grid grid-cols-3 gap-2 text-center">
-                         <h3 className="font-bold text-foundry-accent col-span-3 mb-1">{localize(localizationData, 'PF2E.Actor.Creature.AttributeModifiers')}</h3>
-                         {Object.entries(system.abilities).map(([key, value]: [string, any]) => (
-                             <div key={key}>
-                                 <div className="font-bold uppercase text-sm">{localize(localizationData, `PF2E.AbilityId.${key}`)}</div>
-                                 <div className="text-lg">{value.mod > 0 ? `+${value.mod}` : value.mod}</div>
-                             </div>
-                         ))}
+                         <div className="border-t border-foundry-light pt-2 grid grid-cols-3 gap-2 text-center">
+                             <h3 className="font-bold text-foundry-accent col-span-3 mb-1">{localize(localizationData, 'PF2E.Actor.Creature.AttributeModifiers')}</h3>
+                             {Object.entries(system.abilities).map(([key, value]: [string, any]) => (
+                                 <div key={key}>
+                                     <div className="font-bold uppercase text-sm">{localize(localizationData, `PF2E.AbilityId.${key}`)}</div>
+                                     <div className="text-lg">{value.mod > 0 ? `+${value.mod}` : value.mod}</div>
+                                 </div>
+                             ))}
+                        </div>
                     </div>
                 </aside>
 

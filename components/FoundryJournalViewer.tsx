@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { processFoundryTags } from '../utils/foundryParser';
 
@@ -34,6 +35,7 @@ interface FoundryJournalViewerProps {
 const FoundryJournalViewer: React.FC<FoundryJournalViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, localizationData }) => {
   const journalData = data as JournalData;
   const [activePageIndex, setActivePageIndex] = useState(0);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const contentRef = useRef<HTMLDivElement>(null);
   
   // When the journal data changes (i.e., user switches tabs), reset to the first page.
@@ -116,36 +118,49 @@ const FoundryJournalViewer: React.FC<FoundryJournalViewerProps> = ({ data, onOpe
   }
 
   return (
-    <div className="journal-sheet flex flex-col h-full">
+    <div className="journal-sheet flex flex-col h-full relative">
+      <button 
+          onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+          className="absolute top-2 left-2 z-10 p-2 rounded-full text-white bg-black/30 hover:bg-black/50 transition-all opacity-50 hover:opacity-100"
+          title={isSidebarVisible ? "Скрыть навигацию" : "Показать навигацию"}
+      >
+          {isSidebarVisible ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+          ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+          )}
+      </button>
       <div className="journal-entry-content flex flex-grow overflow-hidden">
-        <aside className="journal-sidebar w-48 p-2 overflow-y-auto flex-shrink-0">
-          <nav>
-            <ul>
-              {journalData.pages.map((page, index) => {
-                // Default to level 1 if not specified. Level 1 has no extra indent.
-                const level = page.title?.level || 1;
-                // 1rem of indentation for each level beyond the first.
-                const indentation = (level - 1) * 1; // in rem
-                // Base horizontal padding is 0.5rem (like px-2).
-                const style = { 
-                  paddingLeft: `${0.5 + indentation}rem`,
-                  paddingRight: '0.5rem'
-                };
+        <aside className={`journal-sidebar transition-all duration-300 overflow-hidden ${isSidebarVisible ? 'w-48 p-2' : 'w-0 p-0'} flex-shrink-0`}>
+          <div className={`${isSidebarVisible ? 'block overflow-y-auto h-full' : 'hidden'}`}>
+            <nav>
+              <ul>
+                {journalData.pages.map((page, index) => {
+                  // Default to level 1 if not specified. Level 1 has no extra indent.
+                  const level = page.title?.level || 1;
+                  // 1rem of indentation for each level beyond the first.
+                  const indentation = (level - 1) * 1; // in rem
+                  // Base horizontal padding is 0.5rem (like px-2).
+                  const style = { 
+                    paddingLeft: `${0.5 + indentation}rem`,
+                    paddingRight: '0.5rem'
+                  };
 
-                return (
-                  <li key={page._id || index}>
-                    <button 
-                      onClick={() => setActivePageIndex(index)}
-                      style={style}
-                      className={`journal-page-link w-full text-left py-1.5 rounded-sm text-sm ${activePageIndex === index ? 'active' : ''}`}
-                    >
-                      {page.name}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
+                  return (
+                    <li key={page._id || index}>
+                      <button 
+                        onClick={() => setActivePageIndex(index)}
+                        style={style}
+                        className={`journal-page-link w-full text-left py-1.5 rounded-sm text-sm ${activePageIndex === index ? 'active' : ''}`}
+                      >
+                        {page.name}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          </div>
         </aside>
 
         <article ref={contentRef} className="journal-entry-page flex-1 overflow-y-auto p-6">
