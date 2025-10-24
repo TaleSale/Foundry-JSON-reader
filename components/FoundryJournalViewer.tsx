@@ -2,6 +2,7 @@
 
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { processFoundryTags } from '../utils/foundryParser';
+import { Journal } from '../services/geminiService';
 
 // A simplified interface for a Foundry journal page
 interface JournalPage {
@@ -20,6 +21,7 @@ interface JournalPage {
 
 // A simplified interface for a Foundry journal
 interface JournalData {
+  _id: string;
   name: string;
   pages: JournalPage[];
   flags?: Record<string, any>; // For theme detection
@@ -29,19 +31,29 @@ interface FoundryJournalViewerProps {
   data: any; // Using any as the full journal structure is complex
   onOpenActorByName: (actorName: string) => void;
   onOpenItemByName: (itemName: string) => void;
+  onOpenJournalAndPage: (journalFoundryId: string, pageFoundryId: string) => void;
   localizationData: Record<string, any> | null;
+  journals: Journal[];
+  initialPageId?: string;
 }
 
-const FoundryJournalViewer: React.FC<FoundryJournalViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, localizationData }) => {
+const FoundryJournalViewer: React.FC<FoundryJournalViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, onOpenJournalAndPage, localizationData, journals, initialPageId }) => {
   const journalData = data as JournalData;
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const contentRef = useRef<HTMLDivElement>(null);
   
-  // When the journal data changes (i.e., user switches tabs), reset to the first page.
+  // When the journal data changes or an initial page is specified, set the active page.
   useEffect(() => {
+    if (initialPageId) {
+        const pageIndex = journalData.pages.findIndex(p => p._id === initialPageId);
+        if (pageIndex !== -1) {
+            setActivePageIndex(pageIndex);
+            return;
+        }
+    }
     setActivePageIndex(0);
-  }, [data]);
+  }, [data, initialPageId, journalData.pages]);
 
   useEffect(() => {
     // Scroll to top of content when page changes
@@ -58,11 +70,15 @@ const FoundryJournalViewer: React.FC<FoundryJournalViewerProps> = ({ data, onOpe
 
         if (link) {
             event.preventDefault();
+            const journalFoundryId = link.dataset.journalFoundryId;
+            const pageFoundryId = link.dataset.pageFoundryId;
             const pageId = link.dataset.pageId;
             const actorName = link.dataset.actorName;
             const itemName = link.dataset.itemName;
             
-            if (pageId) {
+            if (journalFoundryId && pageFoundryId) {
+                onOpenJournalAndPage(journalFoundryId, pageFoundryId);
+            } else if (pageId) {
                 const pageIndex = journalData.pages.findIndex(p => p._id === pageId);
                 if (pageIndex !== -1) {
                     setActivePageIndex(pageIndex);
@@ -85,7 +101,7 @@ const FoundryJournalViewer: React.FC<FoundryJournalViewerProps> = ({ data, onOpe
             contentElement.removeEventListener('click', handleContentClick);
         }
     };
-  }, [journalData.pages, setActivePageIndex, onOpenActorByName, onOpenItemByName]);
+  }, [journalData.pages, setActivePageIndex, onOpenActorByName, onOpenItemByName, onOpenJournalAndPage]);
 
 
   if (!journalData || !Array.isArray(journalData.pages) || journalData.pages.length === 0) {
@@ -103,7 +119,7 @@ const FoundryJournalViewer: React.FC<FoundryJournalViewerProps> = ({ data, onOpe
   }
 
 
-  const processedContent = useMemo(() => processFoundryTags(activePage.text?.content || '', journalData.pages.map(p => p._id), localizationData), [activePage, journalData.pages, localizationData]);
+  const processedContent = useMemo(() => processFoundryTags(activePage.text?.content || '', { pages: journalData.pages, journals, currentJournalId: journalData._id }, localizationData), [activePage, journalData, journals, localizationData]);
 
   const renderPageContent = () => {
     if (activePage.type === 'text' && activePage.text?.content) {

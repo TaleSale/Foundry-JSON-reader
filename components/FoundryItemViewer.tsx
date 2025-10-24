@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { processFoundryTags, localize, formatPrice, formatBulk, slugToPascalCase } from '../utils/foundryParser';
+import { Journal } from '../services/geminiService';
 
 interface FoundryItemViewerProps {
   data: any;
   onOpenActorByName: (actorName: string) => void;
   onOpenItemByName: (itemName: string) => void;
+  onOpenJournalAndPage: (journalFoundryId: string, pageFoundryId: string) => void;
   localizationData: Record<string, any> | null;
+  journals: Journal[];
 }
 
 const TraitPill: React.FC<{ trait: string, localizationData: Record<string, any> | null }> = ({ trait, localizationData }) => {
@@ -22,9 +25,9 @@ const DetailRow: React.FC<{ label: string; children: React.ReactNode }> = ({ lab
     </div>
 );
 
-const renderDescription = (desc: string, localizationData: Record<string, any> | null) => {
+const renderDescription = (desc: string, localizationData: Record<string, any> | null, journals: Journal[]) => {
     if (!desc) return null;
-    const processed = processFoundryTags(desc, [], localizationData);
+    const processed = processFoundryTags(desc, { journals }, localizationData);
     return <div className="text-sm text-foundry-text journal-page-content" dangerouslySetInnerHTML={{ __html: processed }} />;
 };
 
@@ -92,7 +95,7 @@ const ArmorDetails: React.FC<{ system: any, localizationData: Record<string, any
     );
 };
 
-const ConsumableDetails: React.FC<{ system: any, localizationData: Record<string, any> | null }> = ({ system, localizationData }) => (
+const ConsumableDetails: React.FC<{ system: any, localizationData: Record<string, any> | null, journals: Journal[] }> = ({ system, localizationData, journals }) => (
     <>
         <h4 className="text-md font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2 mt-4">Детали расходуемого</h4>
         <div className="text-sm">
@@ -101,7 +104,7 @@ const ConsumableDetails: React.FC<{ system: any, localizationData: Record<string
         {system.spell && (
             <div className="mt-4 p-3 bg-foundry-dark rounded-md">
                 <h5 className="font-bold">{localize(localizationData, 'PF2E.Item.Consumable.Spell.Label', {})}: {system.spell.name}</h5>
-                {renderDescription(system.spell.system.description.value, localizationData)}
+                {renderDescription(system.spell.system.description.value, localizationData, journals)}
             </div>
         )}
     </>
@@ -129,7 +132,7 @@ const EffectDetails: React.FC<{ system: any, localizationData: Record<string, an
 );
 
 
-const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, localizationData }) => {
+const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, onOpenJournalAndPage, localizationData, journals }) => {
     const { system, type, name } = data;
     const itemViewerRef = useRef<HTMLDivElement>(null);
 
@@ -140,10 +143,14 @@ const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActor
 
             if (link) {
                 event.preventDefault();
+                const journalFoundryId = link.dataset.journalFoundryId;
+                const pageFoundryId = link.dataset.pageFoundryId;
                 const actorName = link.dataset.actorName;
                 const itemName = link.dataset.itemName;
                 
-                if (actorName) {
+                if (journalFoundryId && pageFoundryId) {
+                    onOpenJournalAndPage(journalFoundryId, pageFoundryId);
+                } else if (actorName) {
                     onOpenActorByName(actorName);
                 } else if (itemName) {
                     onOpenItemByName(itemName);
@@ -161,7 +168,7 @@ const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActor
                 contentElement.removeEventListener('click', handleContentClick);
             }
         };
-    }, [onOpenActorByName, onOpenItemByName]);
+    }, [onOpenActorByName, onOpenItemByName, onOpenJournalAndPage]);
 
     
     const modifiedName = useMemo(() => {
@@ -184,7 +191,7 @@ const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActor
         switch (data.type) {
             case 'weapon': return <WeaponDetails system={system} localizationData={localizationData} />;
             case 'armor': return <ArmorDetails system={system} localizationData={localizationData} />;
-            case 'consumable': return <ConsumableDetails system={system} localizationData={localizationData} />;
+            case 'consumable': return <ConsumableDetails system={system} localizationData={localizationData} journals={journals} />;
             case 'effect': return <EffectDetails system={system} localizationData={localizationData} />;
             case 'equipment': // Catches runes and other gear
                  return null;
@@ -239,7 +246,7 @@ const FoundryItemViewer: React.FC<FoundryItemViewerProps> = ({ data, onOpenActor
                     </div>
                     
                     <h3 className="text-lg font-bold text-foundry-accent border-b-2 border-foundry-accent mb-2">{localize(localizationData, 'PF2E.HazardDescriptionLabel', {})}</h3>
-                    {renderDescription(system.description.value, localizationData)}
+                    {renderDescription(system.description.value, localizationData, journals)}
                     {renderItemDetails()}
                 </article>
             </main>

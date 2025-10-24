@@ -13,6 +13,7 @@ interface Folder {
 interface OpenTab {
     id:string;
     type: 'journal' | 'actor' | 'item';
+    initialPageId?: string;
 }
 
 interface WorldData {
@@ -249,6 +250,39 @@ const App: React.FC = () => {
             console.warn(`Item "${itemName}" not found in the current world.`);
         }
     }, [items, handleOpenItem]);
+    
+    const handleOpenJournalAndPage = useCallback((journalFoundryId: string, pageFoundryId: string) => {
+        const journal = journals.find(j => {
+            // Check primary _id
+            if (j.data?._id === journalFoundryId) return true;
+            
+            // Check exportSource uuid
+            const sourceUuid = j.data?._stats?.exportSource?.uuid;
+            if (sourceUuid && typeof sourceUuid === 'string') {
+                // The sourceUuid is in the format "JournalEntry.ID"
+                const sourceId = sourceUuid.replace('JournalEntry.', '');
+                if (sourceId === journalFoundryId) {
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        if (journal) {
+            const pageExists = journal.data.pages.some((p: any) => p._id === pageFoundryId);
+            if (pageExists) {
+                const tabExists = openTabs.some(t => t.id === journal.id);
+                if (!tabExists) {
+                    setOpenTabs(prev => [...prev, {id: journal.id, type: 'journal', initialPageId: pageFoundryId}]);
+                } else {
+                    setOpenTabs(prev => prev.map(t => t.id === journal.id ? { ...t, initialPageId: pageFoundryId } : t));
+                }
+                setActiveTabId(journal.id);
+            }
+        } else {
+            console.warn(`Journal with Foundry ID "${journalFoundryId}" not found.`);
+        }
+    }, [journals, openTabs]);
 
     const handleCloseTab = useCallback((tabIdToClose: string) => {
         const newOpenTabs = openTabs.filter(t => t.id !== tabIdToClose);
@@ -516,9 +550,9 @@ const App: React.FC = () => {
                                     })}
                                 </nav>
                             </div>
-                            {activeItem && activeTab?.type === 'journal' && <FoundryJournalViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} localizationData={localizationData} />}
-                            {activeItem && activeTab?.type === 'actor' && <FoundryActorViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} localizationData={localizationData} />}
-                            {activeItem && activeTab?.type === 'item' && <FoundryItemViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} localizationData={localizationData} />}
+                            {activeItem && activeTab?.type === 'journal' && <FoundryJournalViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} onOpenJournalAndPage={handleOpenJournalAndPage} localizationData={localizationData} journals={journals} initialPageId={activeTab.initialPageId} />}
+                            {activeItem && activeTab?.type === 'actor' && <FoundryActorViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} onOpenJournalAndPage={handleOpenJournalAndPage} localizationData={localizationData} journals={journals} />}
+                            {activeItem && activeTab?.type === 'item' && <FoundryItemViewer data={activeItem.data} onOpenActorByName={handleOpenActorByName} onOpenItemByName={handleOpenItemByName} onOpenJournalAndPage={handleOpenJournalAndPage} localizationData={localizationData} journals={journals} />}
                         </>
                     ) : (
                         <div className="flex flex-col h-full p-4 items-center justify-center text-center">

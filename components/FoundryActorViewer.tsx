@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { processFoundryTags, resolvePath, localize, formatPrice, formatBulk, slugToPascalCase } from '../utils/foundryParser';
+import { Journal } from '../services/geminiService';
 
 interface FoundryActorViewerProps {
   data: any;
   onOpenActorByName: (actorName: string) => void;
   onOpenItemByName: (itemName: string) => void;
+  onOpenJournalAndPage: (journalFoundryId: string, pageFoundryId: string) => void;
   localizationData: Record<string, any> | null;
+  journals: Journal[];
 }
 
 const Trait: React.FC<{
@@ -68,13 +71,13 @@ const getActionIcon = (actions: string | null) => {
     return <span className="text-xs">({actions})</span>;
 };
 
-const Spell: React.FC<{spell: any, localizationData: any}> = ({spell, localizationData}) => {
+const Spell: React.FC<{spell: any, localizationData: any, journals: Journal[], onOpenJournalAndPage: (j:string, p:string)=>void}> = ({spell, localizationData, journals, onOpenJournalAndPage}) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const system = spell.system;
     
     const renderSpellDescription = (desc: string) => {
         if (!desc) return null;
-        const processed = processFoundryTags(desc, [], localizationData);
+        const processed = processFoundryTags(desc, { journals, currentJournalId: undefined }, localizationData);
         return <div className="text-sm text-foundry-text-muted mt-2 journal-page-content" dangerouslySetInnerHTML={{ __html: processed }} />;
     };
 
@@ -107,7 +110,7 @@ const Spell: React.FC<{spell: any, localizationData: any}> = ({spell, localizati
     );
 };
 
-const SpellcastingEntry: React.FC<{entry: any, localizationData: any}> = ({ entry, localizationData }) => {
+const SpellcastingEntry: React.FC<{entry: any, localizationData: any, journals: Journal[], onOpenJournalAndPage: (j:string, p:string)=>void}> = ({ entry, localizationData, journals, onOpenJournalAndPage }) => {
     const system = entry.system;
     const prepType = system.prepared.value;
     const localizedPrepType = localize(localizationData, `PF2E.PreparationType${prepType.charAt(0).toUpperCase() + prepType.slice(1)}`);
@@ -144,7 +147,7 @@ const SpellcastingEntry: React.FC<{entry: any, localizationData: any}> = ({ entr
                             </div>
                             <ul className="space-y-1">
                                 {spells.map(spell => (
-                                    <Spell key={spell._id} spell={spell} localizationData={localizationData} />
+                                    <Spell key={spell._id} spell={spell} localizationData={localizationData} journals={journals} onOpenJournalAndPage={onOpenJournalAndPage} />
                                 ))}
                             </ul>
                         </div>
@@ -450,7 +453,7 @@ const InventoryTab: React.FC<{items: any[], localizationData: any, renderDescrip
 };
 
 
-const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, localizationData }) => {
+const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenActorByName, onOpenItemByName, onOpenJournalAndPage, localizationData, journals }) => {
     const [activeTab, setActiveTab] = useState('main');
     const [isSidebarVisible, setIsSidebarVisible] = useState(true);
     const system = data.system;
@@ -463,10 +466,14 @@ const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenAct
 
             if (link) {
                 event.preventDefault();
+                const journalFoundryId = link.dataset.journalFoundryId;
+                const pageFoundryId = link.dataset.pageFoundryId;
                 const actorName = link.dataset.actorName;
                 const itemName = link.dataset.itemName;
                 
-                if (actorName) {
+                if (journalFoundryId && pageFoundryId) {
+                    onOpenJournalAndPage(journalFoundryId, pageFoundryId);
+                } else if (actorName) {
                     onOpenActorByName(actorName);
                 } else if (itemName) {
                     onOpenItemByName(itemName);
@@ -484,7 +491,7 @@ const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenAct
                 contentElement.removeEventListener('click', handleContentClick);
             }
         };
-    }, [onOpenActorByName, onOpenItemByName]);
+    }, [onOpenActorByName, onOpenItemByName, onOpenJournalAndPage]);
 
     const { attacks, actions, spellcastingEntries, inventoryItems } = useMemo(() => {
         if (!data.items) return { attacks: [], actions: [], spellcastingEntries: [], inventoryItems: [] };
@@ -539,7 +546,7 @@ const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenAct
 
     const renderDescription = (desc: string) => {
         if (!desc) return null;
-        const processed = processFoundryTags(desc, [], localizationData);
+        const processed = processFoundryTags(desc, { journals }, localizationData);
         return <div className="text-sm text-foundry-text-muted journal-page-content" dangerouslySetInnerHTML={{ __html: processed }} />;
     };
 
@@ -688,7 +695,7 @@ const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenAct
                             <div className="space-y-6">
                                 {spellcastingEntries.length > 0 ? (
                                     spellcastingEntries.map((entry: any) => (
-                                        <SpellcastingEntry key={entry._id} entry={entry} localizationData={localizationData} />
+                                        <SpellcastingEntry key={entry._id} entry={entry} localizationData={localizationData} journals={journals} onOpenJournalAndPage={onOpenJournalAndPage} />
                                     ))
                                 ) : (
                                     <div className="text-center text-foundry-text-muted pt-8">Заклинательные способности не найдены.</div>
@@ -703,13 +710,13 @@ const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenAct
                                 {system.details.publicNotes && (
                                     <div>
                                         <h3 className="text-lg font-bold text-foundry-accent mb-2">{localize(localizationData, 'PF2E.NPC.PublicNotes')}</h3>
-                                        <div dangerouslySetInnerHTML={{__html: processFoundryTags(system.details.publicNotes, [], localizationData)}} />
+                                        <div dangerouslySetInnerHTML={{__html: processFoundryTags(system.details.publicNotes, { journals }, localizationData)}} />
                                     </div>
                                 )}
                                 {system.details.privateNotes && (
                                     <div>
                                         <h3 className="text-lg font-bold text-foundry-accent mb-2">{localize(localizationData, 'PF2E.NPC.PrivateNotes')}</h3>
-                                        <div dangerouslySetInnerHTML={{__html: processFoundryTags(system.details.privateNotes, [], localizationData)}} />
+                                        <div dangerouslySetInnerHTML={{__html: processFoundryTags(system.details.privateNotes, { journals }, localizationData)}} />
                                     </div>
                                 )}
                             </div>

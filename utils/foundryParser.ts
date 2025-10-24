@@ -1,3 +1,5 @@
+import { Journal } from '../services/geminiService';
+
 /**
  * Resolves a dot-separated path string on a nested object.
  * @param {any} object The object to resolve the path on.
@@ -77,11 +79,11 @@ export const slugToPascalCase = (slug: string): string => {
 /**
  * Processes a string containing Foundry VTT's special syntax and transforms it into formatted HTML.
  * @param {string | undefined} content The raw HTML string from the journal page.
- * @param {string[]} pageIds A list of valid page IDs within the current journal context.
+ * @param {object} context An object containing contextual data like pages and journals.
  * @param {Record<string, any> | null} localizationData The localization data object.
  * @returns {string} The processed HTML string.
  */
-export const processFoundryTags = (content: string | undefined, pageIds: string[], localizationData: Record<string, any> | null): string => {
+export const processFoundryTags = (content: string | undefined, context: { pages?: { _id: string, name: string }[], journals?: Journal[], currentJournalId?: string }, localizationData: Record<string, any> | null): string => {
     if (!content) return '';
 
     let result = content;
@@ -94,7 +96,7 @@ export const processFoundryTags = (content: string | undefined, pageIds: string[
             const translation = resolvePath(localizationData, trimmedKey);
             if (translation !== undefined) {
                 // Recursively process the translated content to handle nested tags like @UUID.
-                return processFoundryTags(translation, pageIds, localizationData);
+                return processFoundryTags(translation, context, localizationData);
             }
             return `<strong>${trimmedKey}</strong>`; // Fallback if key not found
         });
@@ -105,16 +107,58 @@ export const processFoundryTags = (content: string | undefined, pageIds: string[
         return linkText;
     });
 
-    const pageIdSet = new Set(pageIds);
-
-    // Rule for internal journal page links: @UUID[JournalEntry...JournalEntryPage:pageId]{Link Text} -> clickable link
-    result = result.replace(/@UUID\[JournalEntry\..*?\.JournalEntryPage\.(.*?)\]\{(.*?)\}/g, (match, pageId, linkText) => {
-        if (pageIdSet.has(pageId)) {
-            return `<a href="#" class="internal-journal-link" data-page-id="${pageId}">${linkText}</a>`;
-        }
-        return `<strong>${linkText}</strong>`; // Fallback if page ID is not in the current journal
-    });
+    const pageMap = new Map(context.pages?.map(p => [p._id, p.name]));
     
+    // Build a more robust journal map, indexing by both primary _id and source UUID
+    const journalMap = new Map<string, Journal>();
+    if (context.journals) {
+        for (const j of context.journals) {
+            if (j.data?._id) {
+                journalMap.set(j.data._id, j);
+            }
+            const sourceUuid = j.data?._stats?.exportSource?.uuid;
+            if (sourceUuid && typeof sourceUuid === 'string' && sourceUuid.startsWith('JournalEntry.')) {
+                const sourceId = sourceUuid.replace('JournalEntry.', '');
+                if (sourceId && !journalMap.has(sourceId)) {
+                     journalMap.set(sourceId, j);
+                }
+            }
+        }
+    }
+
+    // Regex for journal page links (absolute and relative).
+    // It specifically looks for 16-character alphanumeric IDs used by Foundry.
+    // It also allows for both `.JournalEntryPage.` and `.pages.` as separators for future compatibility.
+    // Group 1: journalId (optional, for absolute links)
+    // Group 2: pageId
+    // Group 3: linkText (optional)
+    const journalPageRegex = /@UUID\[(?:JournalEntry\.([a-zA-Z0-9]{16})\.(?:JournalEntryPage|pages)\.|(?:\.|JournalEntryPage\.))([a-zA-Z0-9]{16})\](?:\{(.*?)\})?/g;
+
+    result = result.replace(journalPageRegex, (match, journalId, pageId, linkText) => {
+        const getLabel = (name: string | undefined): string => {
+            const pageName = name ?? '';
+            // Use provided linkText if it exists and isn't just whitespace
+            if (linkText && linkText.trim()) return linkText;
+            // Otherwise, use the page's name if it exists and isn't just whitespace
+            if (pageName.trim()) return pageName;
+            // As a last resort, use the page ID to ensure the link is visible and identifiable
+            return pageId;
+        };
+
+        if (journalId) {
+            // Absolute link to another journal
+            const journal = journalMap.get(journalId);
+            const page = journal?.data.pages.find((p: any) => p._id === pageId);
+            const label = getLabel(page?.name);
+            return `<a href="#" class="internal-journal-link" data-journal-foundry-id="${journalId}" data-page-foundry-id="${pageId}">${label}</a>`;
+        } else {
+            // Relative link within the current journal
+            const pageName = pageMap.get(pageId);
+            const label = getLabel(pageName);
+            return `<a href="#" class="internal-journal-link" data-page-id="${pageId}">${label}</a>`;
+        }
+    });
+
     // Rule for internal actor links: @UUID[Actor...]{Link Text} -> clickable link
     result = result.replace(/@UUID\[Actor\..*?\]\{(.*?)\}/g, (match, linkText) => {
         return `<a href="#" class="internal-journal-link" data-actor-name="${linkText}">${linkText}</a>`;
