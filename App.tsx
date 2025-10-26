@@ -178,7 +178,7 @@ const App: React.FC = () => {
                 const text = event.target?.result as string;
                 const data = JSON.parse(text);
 
-                if (data.system && (data.type === 'npc' || data.type === 'character')) {
+                if (data.system && (data.type === 'npc' || data.type === 'character' || data.type === 'hazard' || data.type === 'loot')) {
                     const newActor: Actor = {
                         id: crypto.randomUUID(),
                         name: data.name || file.name.replace('.json', ''),
@@ -564,7 +564,7 @@ const App: React.FC = () => {
 
                 <div className="lg:col-span-1 flex flex-col bg-foundry-mid rounded-lg border border-foundry-light overflow-hidden">
                     <header className="bg-foundry-dark p-4 border-b border-foundry-light shadow-md text-center">
-                        <h1 className="text-xl font-bold text-foundry-accent">Foundry VTT Viewer</h1>
+                        <h1 className="text-xl font-bold text-foundry-accent">Foundry-JSON-reader</h1>
                         <div className="relative mt-4">
                             <input
                                 type="text"
@@ -764,6 +764,9 @@ const App: React.FC = () => {
                                                    Load World
                                                </button>
                                                <input type="file" ref={worldInputRef} accept=".json" className="hidden" onChange={(e) => { if(e.target.files) handleLoadWorldFile(e.target.files[0]); e.target.value = ''; }} />
+                                           </div>
+                                            <div className="text-center pt-4 text-xs text-foundry-text-muted border-t border-foundry-light">
+                                                Сделано: Торговец Сказками. Поддержка: <a href="https://boosty.to/tale_sale" target="_blank" rel="noopener noreferrer" className="text-foundry-accent hover:underline">https://boosty.to/tale_sale</a>
                                            </div>
                                        </div>
                                     )}

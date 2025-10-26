@@ -141,7 +141,7 @@ const SpellcastingEntry: React.FC<{entry: any, localizationData: any, journals: 
                                 </h4>
                                 {hasSlots && (
                                     <span className="text-sm text-foundry-text-muted">
-                                        {system.prepared.value === 'innate' ? `${slotInfo.max} ${localize(localizationData, 'PF2E.Frequency.per')} ${localize(localizationData, 'PF2E.Time.Duration.day')}` : `Слоты: ${slotInfo.value} / ${slotInfo.max}`}
+                                        {system.prepared.value === 'innate' ? `${slotInfo.max} ${localize(localizationData, 'PF2E.Frequency.per')} ${localize(localizationData, 'PF2E.Duration.day')}` : `Слоты: ${slotInfo.value} / ${slotInfo.max}`}
                                     </span>
                                 )}
                             </div>
@@ -203,7 +203,7 @@ const WeaponDetails: React.FC<{ system: any, localizationData: any }> = ({ syste
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><strong>{localize(localizationData, 'PF2E.Actor.NPC.BonusLabel.modifier')}:</strong> {attackBonus > 0 ? `+${attackBonus}` : attackBonus}</div>
                 <div><strong>{localize(localizationData, 'PF2E.DamageLabel')}:</strong> {damageDice}d{system.damage.die} {system.damage.damageType}</div>
-                <div><strong>{localize(localizationData, 'PF2E.Item.Weapon.GroupLabel')}:</strong> {localizedGroup}</div>
+                <div><strong>{localize(localizationData, 'PF2E.WeaponGroupLabel')}:</strong> {localizedGroup}</div>
                 {system.range && <div><strong>{localize(localizationData, 'PF2E.Actor.Creature.Sense.RangeLabel')}:</strong> {system.range}</div>}
                 <div><strong>{localize(localizationData, 'PF2E.Item.FIELDS.category.label')}:</strong> {system.category}</div>
             </div>
@@ -447,7 +447,7 @@ const InventoryTab: React.FC<{items: any[], localizationData: any, renderDescrip
                 </details>
             ))}
             
-            <InventorySection title={localize(localizationData, 'PF2E.Actor.NPC.AddTreasure')} items={treasure} localizationData={localizationData} renderDescription={renderDescription} />
+            <InventorySection title={localize(localizationData, 'PF2E.NPC.AddTreasure')} items={treasure} localizationData={localizationData} renderDescription={renderDescription} />
         </div>
     );
 };
@@ -553,6 +553,98 @@ const FoundryActorViewer: React.FC<FoundryActorViewerProps> = ({ data, onOpenAct
     if (!system) {
         return <div className="p-4 text-center">Неверный формат данных актера.</div>;
     }
+
+    // --- LOOT RENDER PATH ---
+    if (data.type === 'loot') {
+        return (
+             <div ref={actorViewerRef} className="bg-foundry-mid text-foundry-text h-full flex flex-col font-sans overflow-hidden">
+                <header className="bg-foundry-dark p-3 border-b border-foundry-light flex justify-between items-center flex-shrink-0">
+                    <h2 className="text-2xl font-bold text-foundry-accent">{data.name}</h2>
+                    <div className="text-right">
+                        <span className="text-lg font-bold">{localize(localizationData, 'PF2E.ItemLevel', { type: localize(localizationData, 'PF2E.loot.LootLabel', {}), level: system.details.level.value })}</span>
+                    </div>
+                </header>
+                <main className="flex-1 p-4 overflow-y-auto space-y-6">
+                    {system.details.description && renderDescription(system.details.description)}
+                    <InventoryTab items={inventoryItems} localizationData={localizationData} renderDescription={renderDescription} />
+                </main>
+             </div>
+        );
+    }
+    
+    // --- HAZARD RENDER PATH ---
+    if (data.type === 'hazard') {
+        const hazardActions = data.items?.filter((item: any) => item.type === 'action') ?? [];
+        
+        const InfoSection: React.FC<{ title: string; content: string; show?: boolean }> = ({ title, content, show = true }) => {
+            if (!show || !content?.trim()) return null;
+            return (
+                <div>
+                    <h3 className="text-lg font-bold border-b-2 border-foundry-accent mb-2">{title}</h3>
+                    {renderDescription(content)}
+                </div>
+            );
+        };
+        
+        return (
+             <div ref={actorViewerRef} className="bg-foundry-mid text-foundry-text h-full flex flex-col font-sans overflow-hidden">
+                <header className="bg-foundry-dark p-3 border-b border-foundry-light flex justify-between items-center flex-shrink-0">
+                    <h2 className="text-2xl font-bold text-foundry-accent">{data.name}</h2>
+                    <div className="text-right">
+                        <span className="text-lg font-bold">{localize(localizationData, 'PF2E.Actor.Hazard.Level', { level: system.details.level.value })}</span>
+                        <div className="flex gap-2 mt-1 flex-wrap justify-end">
+                            {system.traits.rarity && <Trait slug={system.traits.rarity} localizationData={localizationData} />}
+                            {system.traits.value.map((trait: string) => (
+                                <Trait key={trait} slug={trait} localizationData={localizationData} />
+                            ))}
+                        </div>
+                    </div>
+                </header>
+                <main className="flex-1 p-4 overflow-y-auto space-y-6">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3 p-4 bg-foundry-dark rounded-md border border-foundry-light">
+                        <StatBlock label={localize(localizationData, 'PF2E.StealthLabel', {})} value={system.attributes.stealth.value} details={system.attributes.stealth.details?.replace(/<p>|<\/p>/g, '')}/>
+                        <StatBlock label={localize(localizationData, 'PF2E.ArmorClassShortLabel', {})} value={system.attributes.ac.value}/>
+                        <StatBlock label={localize(localizationData, 'PF2E.HardnessLabel', {})} value={system.attributes.hardness}/>
+                        <StatBlock label={localize(localizationData, 'PF2E.HitPointsShortLabel', {})} value={system.attributes.hp.max} details={system.attributes.hp.details}/>
+                    </div>
+
+                    <InfoSection title={localize(localizationData, 'PF2E.HazardDescriptionLabel', {})} content={system.details.description} />
+                    
+                    {hazardActions.length > 0 && (
+                        <div>
+                           <h3 className="text-lg font-bold border-b-2 border-foundry-accent mb-2">{localize(localizationData, 'PF2E.ActionsActionsHeader', {})}</h3>
+                            <div className="space-y-3">
+                                {hazardActions.map((item: any) => (
+                                    <div key={item._id} className="bg-foundry-dark p-3 rounded">
+                                        <p className="font-bold text-base flex justify-between items-center">
+                                            <span>{item.name}</span>
+                                            {getActionIcon(item.system.actionType?.value)}
+                                        </p>
+                                        {item.system.traits.value.length > 0 && (
+                                            <div className="text-xs text-foundry-text-muted mt-1">
+                                                <strong>{localize(localizationData, 'PF2E.TraitsLabel', {})}:</strong> {
+                                                    item.system.traits.value.map((t: string) => localize(localizationData, `PF2E.Trait${slugToPascalCase(t)}`, {}) || t).join(', ')
+                                                }
+                                            </div>
+                                        )}
+                                        {renderDescription(item.system.description.value)}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
+                    <InfoSection title={localize(localizationData, 'PF2E.HazardDisableLabel', {})} content={system.details.disable} />
+
+                    <InfoSection title={localize(localizationData, 'PF2E.HazardRoutineLabel', {})} content={system.details.routine} show={system.details.isComplex}/>
+
+                    <InfoSection title={localize(localizationData, 'PF2E.HazardResetLabel', {})} content={system.details.reset} />
+                </main>
+             </div>
+        );
+    }
+
+    // --- NPC / CHARACTER RENDER PATH ---
 
     const ActorTabButton: React.FC<{tabId: string, label: string}> = ({ tabId, label }) => (
         <button

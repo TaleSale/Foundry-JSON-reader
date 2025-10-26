@@ -62,7 +62,7 @@ const WeaponDetails: React.FC<{ system: any, localizationData: Record<string, an
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><strong>{localize(localizationData, 'PF2E.AttackLabel', {})}:</strong> {attackBonus > 0 ? `+${attackBonus}` : attackBonus}</div>
                 <div><strong>{localize(localizationData, 'PF2E.DamageLabel', {})}:</strong> {damageDice}d{system.damage.die} {system.damage.damageType}</div>
-                <div><strong>{localize(localizationData, 'PF2E.Item.Weapon.GroupLabel', {})}:</strong> {localizedGroup}</div>
+                <div><strong>{localize(localizationData, 'PF2E.WeaponGroupLabel', {})}:</strong> {localizedGroup}</div>
                 {system.range && <div><strong>{localize(localizationData, 'PF2E.Actor.Creature.Sense.RangeLabel', {})}:</strong> {system.range}</div>}
                 <div><strong>{localize(localizationData, 'PF2E.Item.FIELDS.category.label', {})}:</strong> {system.category}</div>
             </div>
